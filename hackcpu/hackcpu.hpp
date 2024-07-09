@@ -15,4 +15,4 @@ typedef ap_axiu<WORD_WIDTH, 0, 0, 0> axi_word_t;
 
 void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
          ap_uint<1>& reset, ap_uint<1>& write_out, word_t& outM, addr_t& addressM, word_t& pc,
-         word_t& debug_A, word_t& debug_D, word_t& debug_instruction);
+         word_t& debug_A, word_t& debug_D, word_t& debug_ALU, word_t& debug_instruction);

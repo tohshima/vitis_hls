@@ -16,6 +16,7 @@ void read_rom_file(const std::string& filename, std::vector<word_t>& rom_content
             instruction = (instruction << 1) | (c - '0');
         }
         rom_content.push_back(instruction);
+        printf("%s %08x\n", line.c_str(), instruction);
     }
 }
 
@@ -36,23 +37,27 @@ int main() {
     word_t pc;
     word_t debug_A;
     word_t debug_D;
+    word_t debug_ALU;
     word_t debug_instruction;
 
     // Reset CPU
-    cpu(rom_in, rom_addr, reset, write_out, outM, addressM, pc, debug_A, debug_D, debug_instruction);
+    cpu(rom_in, rom_addr, reset, write_out, outM, addressM, pc, debug_A, debug_D, debug_ALU, debug_instruction);
 
     // Run simulation
     reset = 0;
+    char buf[512];
     for (int cycle = 0; cycle < 100; ++cycle) {
         // Handle ROM read request
         if (!rom_addr.empty()) {
             axi_word_t addr_req = rom_addr.read();
             addr_t rom_addr_val = addr_req.data;
-            
             if (rom_addr_val < rom_content.size()) {
                 axi_word_t instruction;
                 instruction.data = rom_content[rom_addr_val];
                 rom_in.write(instruction);
+                sprintf(buf, "Cycle %6d: RA=%04x, RD=%04x",
+                    cycle, rom_addr_val.data, instruction.to_ushort());
+                std::cout << buf;
             } else {
                 std::cout << "Error: ROM address out of bounds" << std::endl;
                 break;
@@ -60,14 +65,13 @@ int main() {
         }
 
         // Run CPU cycle
-        cpu(rom_in, rom_addr, reset, write_out, outM, addressM, pc, debug_A, debug_D, debug_instruction);
+        cpu(rom_in, rom_addr, reset, write_out, outM, addressM, pc, debug_A, debug_D, debug_ALU, debug_instruction);
 
         // Print CPU state
-        std::cout << "Cycle " << std::setw(3) << cycle 
-                  << ": PC = " << std::setw(5) << pc
-                  << ", A = " << std::setw(5) << debug_A
-                  << ", D = " << std::setw(5) << debug_D
-                  << ", Instruction = 0x" << std::hex << std::setw(4) << std::setfill('0') << debug_instruction << std::dec << std::setfill(' ');
+        sprintf(buf, ", PC=%04x, A=%04x, D=%04x, ALU=%04x, Inst=%04x",
+            pc.to_ushort(),debug_A.to_ushort(),debug_D.to_ushort(), 
+            debug_ALU.to_ushort(), debug_instruction.to_ushort());
+        std::cout << buf << std::endl;
         if (write_out) {
             std::cout << ", Writing " << outM << " to RAM[" << addressM << "]";
         }

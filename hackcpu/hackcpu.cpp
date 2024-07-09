@@ -3,7 +3,7 @@
 // CPU function
 void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
          ap_uint<1>& reset, ap_uint<1>& write_out, word_t& outM, addr_t& addressM, word_t& pc,
-         word_t& debug_A, word_t& debug_D, word_t& debug_instruction) {
+         word_t& debug_A, word_t& debug_D, word_t& debug_ALU, word_t& debug_instruction) {
 #pragma HLS INTERFACE axis port=rom_in
 #pragma HLS INTERFACE axis port=rom_addr
 #pragma HLS INTERFACE ap_none port=reset
@@ -13,25 +13,29 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
 #pragma HLS INTERFACE ap_none port=pc
 #pragma HLS INTERFACE ap_none port=debug_A
 #pragma HLS INTERFACE ap_none port=debug_D
+#pragma HLS INTERFACE ap_none port=debug_ALU
 #pragma HLS INTERFACE ap_none port=debug_instruction
 
     // Internal RAM
     static word_t ram[1 << ADDR_WIDTH];
-#pragma HLS RESOURCE variable=ram core=RAM_2P_BRAM
+#pragma HLS BIND_STORAGE variable=ram type=RAM_2P impl=BRAM
 
     // CPU registers
     static word_t A = 0, D = 0;
     static addr_t PC = 0;
 
+    static axi_word_t rom_addr_out;
+
     if (reset) {
         A = 0;
         D = 0;
         PC = 0;
+        rom_addr_out.data = PC;
+        rom_addr.write(rom_addr_out);
         return;
     }
 
     // Fetch instruction from ROM
-    axi_word_t rom_addr_out;
     rom_addr_out.data = PC;
     rom_addr.write(rom_addr_out);
     
@@ -43,6 +47,7 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
     
     if (is_a_instruction) {
         A = instruction;
+        PC++;
     } else {
         // C-instruction
         word_t alu_out;
@@ -88,10 +93,8 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
         } else {
             PC++;
         }
-    }
-
-    if (!is_a_instruction) {
-        PC++;
+    
+        debug_ALU = alu_out;
     }
     
     // Update debug information
