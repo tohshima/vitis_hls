@@ -56,7 +56,7 @@ int main() {
                 instruction.data = rom_content[rom_addr_val];
                 rom_in.write(instruction);
                 sprintf(buf, "Cycle %6d: RA=%04x, RD=%04x",
-                    cycle, rom_addr_val.data, instruction.to_ushort());
+                    cycle, rom_addr_val.to_ushort(), instruction.data.to_ushort());
                 std::cout << buf;
             } else {
                 std::cout << "Error: ROM address out of bounds" << std::endl;

@@ -35,10 +35,6 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
         return;
     }
 
-    // Fetch instruction from ROM
-    rom_addr_out.data = PC;
-    rom_addr.write(rom_addr_out);
-    
     axi_word_t instruction_in = rom_in.read();
     word_t instruction = instruction_in.data;
 
@@ -96,7 +92,10 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
     
         debug_ALU = alu_out;
     }
-    
+    // Fetch instruction from ROM for next cycle
+    rom_addr_out.data = PC;
+    rom_addr.write(rom_addr_out);
+        
     // Update debug information
     pc = PC;
     debug_A = A;

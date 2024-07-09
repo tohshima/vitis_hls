@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\hackcpu",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "-DALLOW_EMPTY_HLS_STREAM_READS",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\hackcpu\\hackcpu.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\hackcpu\\hackcpu.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\hackcpu",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls-tb",
+      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\hackcpu\\test_bench.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\hackcpu\\test_bench.cpp"
+  }
+]
