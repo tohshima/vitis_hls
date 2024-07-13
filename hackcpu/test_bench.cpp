@@ -38,7 +38,7 @@ int main() {
 
     // Run simulation
     reset = 0;
-    //for (int cycle = 0; cycle < 100; ++cycle) {
+    for (int cycle = 0; cycle < 20; ++cycle) {
 
         // Run CPU cycle
         cpu(ROM, reset, debug);
@@ -57,7 +57,7 @@ int main() {
             }
             std::cout << std::endl;
         }
-    //}
+    }
 
     return 0;
 }

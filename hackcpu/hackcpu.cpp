@@ -71,7 +71,7 @@ static void updatePC(bool jump, addr_t& PC, word_t& A, word_t instruction) {
 // ToDo: rom double word, ram_read axilite_s?), debug->stream
 void cpu(word_t rom[1 << ADDR_WIDTH],
          ap_uint<1>& reset, hls::stream<debug_t>& debug) {
-#pragma HLS INTERFACE ap_memory port=rom
+#pragma HLS INTERFACE ap_memory port=rom latency=2
 #pragma HLS INTERFACE ap_none port=reset
 #pragma HLS INTERFACE axis port=debug
 
@@ -93,7 +93,8 @@ static word_t ram[1 << ADDR_WIDTH];
         Regs.PC = 0;
         return;
     } else {
-        for (int cycle = 0; ; cycle++) {
+        //for (int cycle = 0; ; cycle++) {
+        //    #pragma HLS pipeline II=2
             // C-instruction
             word_t alu_out = 0;
             ap_uint<1> write_out = 0;
@@ -101,6 +102,7 @@ static word_t ram[1 << ADDR_WIDTH];
             addr_t addressM = 0;
 
             word_t instruction = rom[Regs.PC];
+            //if (instruction == INST_FETCH_STOP) break;
 
             // Decode and execute instruction
             bool is_a_instruction = (instruction[15] == 0);
@@ -127,7 +129,7 @@ static word_t ram[1 << ADDR_WIDTH];
 
             // Update debug information
             debug_t dinfo;
-            dinfo.data.cycle = cycle;
+            //dinfo.data.cycle = cycle;
             dinfo.data.write_out = write_out;
             dinfo.data.outM = outM;
             dinfo.data.addressM = addressM;
@@ -138,7 +140,6 @@ static word_t ram[1 << ADDR_WIDTH];
             dinfo.data.instruction = instruction;
             debug.write(dinfo);
 
-            if (instruction == INST_FETCH_STOP) break;
-        }
+        //}
     }
 }
