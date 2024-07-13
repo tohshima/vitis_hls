@@ -68,77 +68,66 @@ static void updatePC(bool jump, addr_t& PC, word_t& A, word_t instruction) {
 }
 
 // CPU function
-// ToDo: rom double word, ram_read axilite_s?), debug->stream
 void cpu(word_t rom[1 << ADDR_WIDTH],
-         ap_uint<1>& reset, hls::stream<debug_t>& debug) {
+         ap_uint<1>& reset, ap_uint<1>& write_out, word_t& outM, addr_t& addressM, word_t& pc,
+         word_t& debug_A, word_t& debug_D, word_t& debug_ALU, word_t& debug_instruction) {
 #pragma HLS INTERFACE ap_memory port=rom
 #pragma HLS INTERFACE ap_none port=reset
-#pragma HLS INTERFACE axis port=debug
+#pragma HLS INTERFACE ap_vld port=write_out
+#pragma HLS INTERFACE ap_vld port=outM
+#pragma HLS INTERFACE ap_vld port=addressM
+#pragma HLS INTERFACE ap_vld port=pc
+#pragma HLS INTERFACE ap_vld port=debug_A
+#pragma HLS INTERFACE ap_vld port=debug_D
+#pragma HLS INTERFACE ap_vld port=debug_ALU
+#pragma HLS INTERFACE ap_vld port=debug_instruction
 
-// CPU registers
-typedef struct {
-    word_t A;
-    word_t D;
-    addr_t PC;
-} regs_s;
-static regs_s Regs;
-
-// Internal RAM
-static word_t ram[1 << ADDR_WIDTH];
+    // Internal RAM
+    static word_t ram[1 << ADDR_WIDTH];
 #pragma HLS BIND_STORAGE variable=ram type=RAM_2P impl=BRAM
 
+    // CPU registers
+    static word_t A = 0, D = 0;
+    static addr_t PC = 0;
+
     if (reset) {
-        Regs.A = 0;
-        Regs.D = 0;
-        Regs.PC = 0;
+        A = 0;
+        D = 0;
+        PC = 0;
         return;
-    } else {
-        for (int cycle = 0; ; cycle++) {
-            // C-instruction
-            word_t alu_out = 0;
-            ap_uint<1> write_out = 0;
-            word_t outM = 0;
-            addr_t addressM = 0;
-
-            word_t instruction = rom[Regs.PC];
-
-            // Decode and execute instruction
-            bool is_a_instruction = (instruction[15] == 0);
-            
-            if (is_a_instruction) {
-                Regs.A = instruction;
-                Regs.PC++;
-            } else {
-                bool jump = false;
-
-                // ALU computation
-                comp(instruction, Regs.A, Regs.D, ram, alu_out);
-                
-                // Destination
-                get_destination(instruction, alu_out,
-                    Regs.A, Regs.D, ram, write_out, outM, addressM);
-
-                // Jump condition
-                jump = get_jump_condition(alu_out, instruction);
-
-                // Update PC
-                updatePC(jump, Regs.PC, Regs.A, instruction);                
-            }
-
-            // Update debug information
-            debug_t dinfo;
-            dinfo.data.cycle = cycle;
-            dinfo.data.write_out = write_out;
-            dinfo.data.outM = outM;
-            dinfo.data.addressM = addressM;
-            dinfo.data.pc = Regs.PC;
-            dinfo.data.pc = Regs.PC;
-            dinfo.data.regA = Regs.A;
-            dinfo.data.regD = Regs.D;
-            dinfo.data.instruction = instruction;
-            debug.write(dinfo);
-
-            if (instruction == INST_FETCH_STOP) break;
-        }
     }
+
+    word_t instruction = rom[PC];
+
+    // Decode and execute instruction
+    bool is_a_instruction = (instruction[15] == 0);
+    
+    if (is_a_instruction) {
+        A = instruction;
+        PC++;
+    } else {
+        // C-instruction
+        word_t alu_out;
+        bool jump = false;
+
+        // ALU computation
+        comp(instruction, A, D, ram, alu_out);
+        
+        // Destination
+        get_destination(instruction, alu_out,
+            A, D, ram, write_out, outM, addressM);
+
+        // Jump condition
+        jump = get_jump_condition(alu_out, instruction);
+
+        // Update PC
+        updatePC(jump, PC, A, instruction);
+        debug_ALU = alu_out;
+    }
+        
+    // Update debug information
+    pc = PC;
+    debug_A = A;
+    debug_D = D;
+    debug_instruction = instruction;
 }
