@@ -71,7 +71,7 @@ static void updatePC(bool jump, addr_t& PC, word_t& A, word_t instruction) {
 // ToDo: rom double word, ram_read axilite_s?), debug->stream
 void cpu(word_t rom[1 << ADDR_WIDTH],
          ap_uint<1>& reset, hls::stream<debug_t>& debug) {
-#pragma HLS INTERFACE ap_memory port=rom
+#pragma HLS INTERFACE ap_memory port=rom storage_type=ram_2p
 #pragma HLS INTERFACE ap_none port=reset
 #pragma HLS INTERFACE axis port=debug
 
@@ -101,14 +101,21 @@ static word_t ram[1 << ADDR_WIDTH];
             addr_t addressM = 0;
 
             word_t instruction = rom[Regs.PC];
-
+            #ifdef AINST_FALL_THROUGH
+            word_t next_inst = rom[Regs.PC+1];
+            #endif
             // Decode and execute instruction
             bool is_a_instruction = (instruction[15] == 0);
             
             if (is_a_instruction) {
                 Regs.A = instruction;
+                instruction = next_inst;
                 Regs.PC++;
-            } else {
+            }
+            #ifndef AINST_FALL_THROUGH
+            else
+            #endif
+            {
                 bool jump = false;
 
                 // ALU computation

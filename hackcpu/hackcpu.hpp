@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <hls_stream.h>
 
+// A-instruction fall through mode (can be dual issue with the next instruction)
+#define AINST_FALL_THROUGH
+
 // Define bit widths
 const int WORD_WIDTH = 16;
 const int ADDR_WIDTH = 15;
