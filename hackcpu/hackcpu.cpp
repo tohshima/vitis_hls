@@ -86,12 +86,13 @@ static ap_uint<1> write_out = 0;
 static word_t outM = 0;
 static addr_t addressM = 0;
 static word_t instruction;
+static word_t first_inst; // only for debug
 static word_t next_inst;
 static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
 
 // CPU function
-// ToDo: rom double word, ram_read axilite_s?), debug->stream
+// ToDo: c-inst dual issue, dynamic dual issue mode, rom burst fetch
 static void cpu(word_t i_ram[1 << ADDR_WIDTH],
          word_t d_ram[1 << ADDR_WIDTH],
          ap_uint<1>& reset) {
@@ -107,24 +108,28 @@ static void cpu(word_t i_ram[1 << ADDR_WIDTH],
         return;
     } else {
         for (; ; cycle++) {
+            #pragma HLS PIPELINE II=2
             if (cycle == cycle_to_stop) break;
 
             // Fetch
             instruction = i_ram[Regs.PC];
-            #ifdef AINST_FALL_THROUGH
+            first_inst = instruction; // only for debug
+            #ifdef AINST_DUAL_ISSUE
             next_inst = i_ram[Regs.PC+1];
+            #else
+            next_inst = INST_NO_DUAL;
             #endif
             // Decode and execute instruction
             bool is_a_instruction = (instruction[15] == 0);
             
             if (is_a_instruction) {
                 Regs.A = instruction;
-                #ifdef AINST_FALL_THROUGH
+                #ifdef AINST_DUAL_ISSUE
                 instruction = next_inst;
-                Regs.PC++;
                 #endif
+                Regs.PC++;
             }
-            #ifdef AINST_FALL_THROUGH
+            #ifdef AINST_DUAL_ISSUE
             else { next_inst = INST_NO_DUAL;}
             #else
             else
@@ -175,19 +180,20 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             case NORMAL_OPERATION:
                 cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
                 break;
-            case ASSERT_RESET:
-                reset = 1;
-                halt= 1;
+            case SET_RESET:
+            {
+                word_t bitmap = command_packet_in.read();
+                if (bitmap & RESET_BIT_RESET) reset = 1;
+                if (bitmap & RESET_BIT_HALT) halt= 1;
                 break;
-            case DEASSERT_RESET:
-                reset = 0;
+            }
+            case CLEAR_RESET:
+            {
+                word_t bitmap = command_packet_in.read();
+                if (bitmap & RESET_BIT_RESET) reset = 0;
+                if (bitmap & RESET_BIT_HALT) halt= 0;
                 break;
-            case ASSERT_HALT:
-                halt = 1;
-                break;
-            case DEASSERT_HALT:
-                halt = 0;
-                break;
+            }
             case WRITE_TO_IRAM: 
             {
                 addr_t address = (addr_t)command_packet_in.read();
@@ -212,21 +218,26 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 cycle_to_stop = cycle+1;
                 halt = 0;
                 break;
-            case GET_CYCLE:
-                command_packet_out.write(cycle & 0xFFFF);
-                command_packet_out.write((cycle >> 16) & 0xFFFF);
-                command_packet_out.write((cycle >> 32) & 0xFFFF);
-                command_packet_out.write((cycle >> 48) & 0xFFFF);
+            case GET_DEBUG_INFO:
+            {
+                word_t bitmap = command_packet_in.read();
+                if (bitmap & DINFO_BIT_CYCLE) {
+                    command_packet_out.write(cycle & 0xFFFF);
+                    command_packet_out.write((cycle >> 16) & 0xFFFF);
+                    command_packet_out.write((cycle >> 32) & 0xFFFF);
+                    command_packet_out.write((cycle >> 48) & 0xFFFF);
+                }
+                if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
+                if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
+                if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
+                if (bitmap & DINFO_BIT_PC) command_packet_out.write(Regs.PC);
+                if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
+                if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
+                if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
+                if (bitmap & DINFO_BIT_INST1) command_packet_out.write(first_inst);
+                if (bitmap & DINFO_BIT_INST2) command_packet_out.write(next_inst);
                 break;
-            case GET_PC:
-                command_packet_out.write(Regs.PC);
-                break;
-            case GET_INST1:
-                command_packet_out.write(instruction);
-                break;
-            case GET_INST2:
-                command_packet_out.write(next_inst);
-                break;
+            }
 
             default:
                 break;

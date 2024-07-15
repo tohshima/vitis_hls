@@ -4,7 +4,7 @@
 #include <ap_axi_sdata.h>
 
 // A-instruction fall through mode (can be dual issue with the next instruction)
-#define AINST_FALL_THROUGH
+//#define AINST_DUAL_ISSUE
 
 // Define bit widths
 const int WORD_WIDTH = 16;
@@ -33,9 +33,27 @@ typedef enum {
     GET_DEBUG_INFO      = 0x8010,
 } control_command_e;
 
+typedef enum {
+    RESET_BIT_RESET = 0x0001,
+    RESET_BIT_HALT  = 0x0002,
+} reset_bitmap_e;
+
+typedef enum {
+    DINFO_BIT_CYCLE     = 0x0001,
+    DINFO_BIT_WOUT      = 0x0002,
+    DINFO_BIT_OUTM      = 0x0004,
+    DINFO_BIT_ADDRM     = 0x0008,
+    DINFO_BIT_PC        = 0x0010,
+    DINFO_BIT_REGA      = 0x0020,
+    DINFO_BIT_REGD      = 0x0040,
+    DINFO_BIT_ALUO      = 0x0080,
+    DINFO_BIT_INST1     = 0x0100,
+    DINFO_BIT_INST2     = 0x0200,
+} debug_info_bitmap_e;
+
 // For debug
 typedef struct {
-    uint32_t    cycle;
+    uint64_t    cycle;
     ap_uint<1>  write_out;
     word_t      outM;
     addr_t      addressM;
@@ -43,10 +61,9 @@ typedef struct {
     word_t      regA;
     word_t      regD;
     word_t      alu_out;
-    word_t      instruction;
+    word_t      instruction1;
+    word_t      instruction2;
 } debug_s;
-
-typedef hls::axis<debug_s, 0,0,0> debug_t;
 
 void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                             hls::stream<word_t>& command_packet_out);
