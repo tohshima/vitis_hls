@@ -32,7 +32,7 @@ void read_rom_file(const std::string& filename,
 }
 
 void get_debug_info(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, word_t bitmap, debug_s& dinfo) {
-    command_in.write(SET_RESET);
+    command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_HALT);
     command_in.write(GET_DEBUG_INFO);
     command_in.write(bitmap);
@@ -103,11 +103,11 @@ int main() {
     hls::stream<word_t> command_out;
 
     // Reset CPU
-    command_in.write(SET_RESET);
+    command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_RESET | RESET_BIT_HALT);
     cpu_wrapper(command_in, command_out);
-    command_in.write(CLEAR_RESET);
-    command_in.write(RESET_BIT_RESET);
+    command_in.write(SET_RESET_CONFIG);
+    command_in.write(RESET_BIT_HALT);
     cpu_wrapper(command_in, command_out);
 
     // Write to ROM
@@ -117,8 +117,8 @@ int main() {
     // Run CPU cycle
     #if 0
     // Run through
-    command_in.write(CLEAR_RESET);
-    command_in.write(RESET_BIT_HALT);
+    command_in.write(SET_RESET_CONFIG);
+    command_in.write(0);
     cpu_wrapper(command_in, command_out);
     #else
     // Step debugging
@@ -129,7 +129,7 @@ int main() {
     }
     #endif
 
-    command_in.write(SET_RESET);
+    command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_HALT);
     command_in.write(READ_FROM_DRAM);
     command_in.write(0x0007);

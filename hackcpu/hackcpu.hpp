@@ -22,13 +22,16 @@ typedef ap_uint<ADDR_WIDTH> addr_t;
 
 // Conntrol command
 typedef enum {
-    NORMAL_OPERATION    = 0x0000,
-    SET_RESET           = 0x0001,
-    CLEAR_RESET         = 0x0002,    
+    NO_OPERATION        = 0x0000,
+    NORMAL_OPERATION    = 0x0001,
+    SET_RESET_CONFIG    = 0x0002,
+    GET_RESET_CONFIG    = 0x0003,    
     WRITE_TO_IRAM       = 0x0010,
-    WRITE_TO_DRAM       = 0x0012,
-    READ_FROM_DRAM      = 0x0013,
-    DUMP_FROM_DRAM      = 0x0014,
+    LOAD_TO_IRAM        = 0x0011,
+    READ_FROM_IRAM      = 0x0012,
+    WRITE_TO_DRAM       = 0x0020,
+    READ_FROM_DRAM      = 0x0021,
+    DUMP_FROM_DRAM      = 0x0022,
     STEP_EXECUTION      = 0x8000,
     GET_DEBUG_INFO      = 0x8010,
 } control_command_e;
@@ -36,7 +39,7 @@ typedef enum {
 typedef enum {
     RESET_BIT_RESET = 0x0001,
     RESET_BIT_HALT  = 0x0002,
-} reset_bitmap_e;
+} reset_config_bitmap_e;
 
 typedef enum {
     DINFO_BIT_CYCLE     = 0x0001,

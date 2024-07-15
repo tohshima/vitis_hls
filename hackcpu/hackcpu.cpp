@@ -180,18 +180,19 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             case NORMAL_OPERATION:
                 cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
                 break;
-            case SET_RESET:
+            case SET_RESET_CONFIG:
             {
                 word_t bitmap = command_packet_in.read();
-                if (bitmap & RESET_BIT_RESET) reset = 1;
-                if (bitmap & RESET_BIT_HALT) halt= 1;
+                reset = (bitmap & RESET_BIT_RESET)? 1: 0;
+                halt = (bitmap & RESET_BIT_HALT)? 1: 0;
                 break;
             }
-            case CLEAR_RESET:
+            case GET_RESET_CONFIG:
             {
-                word_t bitmap = command_packet_in.read();
-                if (bitmap & RESET_BIT_RESET) reset = 0;
-                if (bitmap & RESET_BIT_HALT) halt= 0;
+                word_t bitmap = 0;
+                if (reset) bitmap |= RESET_BIT_RESET;
+                if (halt) bitmap |= RESET_BIT_HALT;
+                command_packet_out.write(bitmap);
                 break;
             }
             case WRITE_TO_IRAM: 
