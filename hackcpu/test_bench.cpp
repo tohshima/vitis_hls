@@ -123,9 +123,9 @@ int main() {
     #else
     // Step debugging
     for (int i = 0; i < 20; i++) {
-        compare(command_in, command_out, (i == 0));
         command_in.write(STEP_EXECUTION);
         cpu_wrapper(command_in, command_out);
+        compare(command_in, command_out, (i == 0));
     }
     #endif
 

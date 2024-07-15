@@ -81,6 +81,7 @@ typedef struct {
 } regs_s;
 static regs_s Regs;
 
+static addr_t pc_of_cycle_start; // only for debug
 static word_t alu_out = 0;
 static ap_uint<1> write_out = 0;
 static word_t outM = 0;
@@ -109,7 +110,9 @@ static void cpu(word_t i_ram[1 << ADDR_WIDTH],
     } else {
         for (; ; cycle++) {
             #pragma HLS PIPELINE II=2
+
             if (cycle == cycle_to_stop) break;
+            pc_of_cycle_start = Regs.PC;
 
             // Fetch
             instruction = i_ram[Regs.PC];
@@ -231,7 +234,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
                 if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
                 if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
-                if (bitmap & DINFO_BIT_PC) command_packet_out.write(Regs.PC);
+                if (bitmap & DINFO_BIT_PC) command_packet_out.write(pc_of_cycle_start);
                 if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
                 if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
                 if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
