@@ -9,7 +9,8 @@
 // Define bit widths
 const int WORD_WIDTH = 16;
 const int ADDR_WIDTH = 15;
-
+const int IRAM_SIZE  = 1 << ADDR_WIDTH;
+const int DRAM_SIZE  = 1 << ADDR_WIDTH;
 const int TRARCE_SIZE = 32;
 
 // Debug instrction

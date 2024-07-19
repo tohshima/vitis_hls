@@ -2,7 +2,7 @@
 
 static void comp(word_t instruction, 
                  word_t A, word_t D, 
-                 word_t ram[1 << ADDR_WIDTH], 
+                 word_t ram[IRAM_SIZE], 
                  word_t& alu_out) {
 #pragma HLS inline
     word_t x = D;
@@ -33,7 +33,7 @@ static void comp(word_t instruction,
 
 static void get_destination(word_t instruction, word_t alu_out, 
     word_t& A, word_t& D, 
-    word_t ram[1 << ADDR_WIDTH], 
+    word_t ram[DRAM_SIZE], 
     ap_uint<1>& write_out, word_t& outM, addr_t& addressM) {
 #pragma HLS inline
 
@@ -93,9 +93,10 @@ static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
 
 // CPU function
-// ToDo: c-inst dual issue, dynamic dual issue mode, rom burst fetch
-static void cpu(word_t i_ram[1 << ADDR_WIDTH],
-         word_t d_ram[1 << ADDR_WIDTH],
+// ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
+//       Separate M load 
+static void cpu(word_t i_ram[IRAM_SIZE],
+         word_t d_ram[DRAM_SIZE],
          ap_uint<1>& reset) {
 #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
 #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
@@ -167,11 +168,11 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
     //#pragma HLS INTERFACE ap_fifo port=debug 
 
     // Internal ROM
-    static word_t i_ram[1 << ADDR_WIDTH];
+    static word_t i_ram[IRAM_SIZE];
     #pragma HLS BIND_STORAGE variable=i_ram type=RAM_2P impl=BRAM
 
     // Internal RAM
-    static word_t d_ram[1 << ADDR_WIDTH];
+    static word_t d_ram[DRAM_SIZE];
     #pragma HLS BIND_STORAGE variable=d_ram type=RAM_T2P impl=BRAM
 
     static ap_uint<1> reset = 1;
@@ -203,6 +204,16 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 addr_t address = (addr_t)command_packet_in.read();
                 word_t data = command_packet_in.read();
                 i_ram[address] = data;
+                break;
+            }
+            case LOAD_TO_IRAM: 
+            {
+                addr_t address = (addr_t)command_packet_in.read();
+                word_t length = command_packet_in.read();
+                for (word_t i = 0; i < length; i++) {
+                    word_t data = command_packet_in.read();
+                    i_ram[address+i] = data;
+                }
                 break;
             }
             case WRITE_TO_DRAM: 

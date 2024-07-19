@@ -10,25 +10,27 @@
 void read_rom_file(const std::string& filename,
              hls::stream<word_t>& command_in,
              hls::stream<word_t>& command_out) {
-    const int rom_size = 1 << ADDR_WIDTH;
-    //for (int i = 0; i < rom_size; i++) ROM[i] = INST_FETCH_STOP;
-
     std::ifstream file(filename);
     std::string line;
+
+    word_t tmp[IRAM_SIZE];
     
-    int addr = 0;
+    int length = 0;
     while (std::getline(file, line)) {
         word_t instruction = 0;
         for (char c : line) {
             instruction = (instruction << 1) | (c - '0');
         }
-        command_in.write(WRITE_TO_IRAM);
-        command_in.write(addr++);
-        command_in.write(instruction);
-        cpu_wrapper(command_in, command_out);
-        //ROM[addr++] = instruction;
+        tmp[length++] = instruction;
         printf("%s %08x\n", line.c_str(), instruction.to_ushort());
     }
+    command_in.write(LOAD_TO_IRAM);
+    command_in.write(0);
+    command_in.write(length);
+    for (int i = 0; i < length; i++) {
+        command_in.write(tmp[i]);
+    }
+    cpu_wrapper(command_in, command_out);
 }
 
 void get_debug_info(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, word_t bitmap, debug_s& dinfo) {
