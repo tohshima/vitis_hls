@@ -62,9 +62,6 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
     if (header) {
         if (bitmap) std::cout << "|";
         if (bitmap & DINFO_BIT_CYCLE) std::cout << " cycle |";
-        if (bitmap & DINFO_BIT_WOUT) std::cout << " wout |";
-        if (bitmap & DINFO_BIT_OUTM) std::cout << " outM  |";
-        if (bitmap & DINFO_BIT_ADDRM)  std::cout << " addrM |";
         if (bitmap & DINFO_BIT_PC)  std::cout << "  PC   |";
         if (bitmap & DINFO_BIT_REGA)  std::cout << "   A   |";
         if (bitmap & DINFO_BIT_ALUO)  std::cout << "  ALU  |";
