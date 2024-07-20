@@ -1,13 +1,6 @@
 #include "hackcpu.hpp"
 
-static void comp(word_t instruction, 
-                 word_t A, word_t D, 
-                 word_t ram[IRAM_SIZE], 
-                 word_t& alu_out) {
-#pragma HLS inline
-    word_t x = D;
-    word_t y = instruction[12] ? ram[A] : A;  // A/M bit
-
+static void comp_core(word_t instruction, word_t x, word_t y, word_t &alu_out) {
     switch (instruction(11, 6)) {
         case 0b101010: alu_out = 0; break;                    // 0
         case 0b111111: alu_out = 1; break;                    // 1
@@ -29,6 +22,23 @@ static void comp(word_t instruction,
         case 0b010101: alu_out = x | y; break;                // D|A/M
         default: alu_out = 0; // Undefined behavior
     }
+}
+
+static void comp(word_t instruction, 
+                 word_t A, word_t D, 
+                 word_t& alu_out) {
+#pragma HLS inline
+    word_t x = D;
+    word_t y = A;
+    comp_core(instruction, x, y, alu_out);
+}
+
+static void compM(word_t instruction, word_t A, word_t D, word_t ram[IRAM_SIZE],
+                  word_t &alu_out) {
+#pragma HLS inline
+    word_t x = D;
+    word_t y = ram[A];
+    comp_core(instruction, x, y, alu_out);
 }
 
 static void get_destination(word_t instruction, word_t alu_out, 
@@ -89,8 +99,9 @@ static addr_t addressM = 0;
 static word_t instruction;
 static word_t first_inst; // only for debug
 static word_t next_inst;
+static ap_uint<1> cinst_phase = 0;
 static uint64_t cycle = 0;
-static uint64_t cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
+static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
 
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
@@ -109,10 +120,14 @@ static void cpu(word_t i_ram[IRAM_SIZE],
         cycle = 0;
         return;
     } else {
-        for (; ; cycle++) {
+        for (; cycle < cycle_to_stop ; cycle++) {
+            #ifdef PIPELINE_II_1
+            #pragma HLS PIPELINE II=1
+            #else
             #pragma HLS PIPELINE II=2
+            #endif
 
-            if (cycle == cycle_to_stop) break;
+            //if (cycle == cycle_to_stop) break;
             pc_of_cycle_start = Regs.PC;
 
             // Fetch
@@ -139,23 +154,47 @@ static void cpu(word_t i_ram[IRAM_SIZE],
             else
             #endif
             {
-                bool jump = false;
+#if defined(PIPELINE_II_1) && defined(REDUCE_CINST_CYCLE)
+                if ((cinst_phase == 0) && (instruction[12] == 0) && (instruction[3] == 0))
+                {
+                    // No memomory access case for both of source and detination, it can go through cinst_phase 1.
+                    comp(instruction, Regs.A, Regs.D, alu_out);
+                    cinst_phase = 1;
+                }
+#endif
+#ifdef PIPELINE_II_1
+                if (cinst_phase == 0) {
+#endif
+#if defined(PIPELINE_II_1) && defined(REDUCE_CINST_CYCLE)
+                    // ALU computation using M
+                    compM(instruction, Regs.A, Regs.D, d_ram, alu_out);
+#else
+                    // ALU computation using 
+                    if (instruction[12] == 0) {
+                        comp(instruction, Regs.A, Regs.D, alu_out);
+                    } else {
+                        compM(instruction, Regs.A, Regs.D, d_ram, alu_out);
+                    }
+#endif
+                    cinst_phase = 1;
+#ifdef PIPELINE_II_1
+                } else {
+#endif             
+                    bool jump = false;
+                    // Destination
+                    get_destination(instruction, alu_out,
+                        Regs.A, Regs.D, d_ram, write_out, outM, addressM);
 
-                // ALU computation
-                comp(instruction, Regs.A, Regs.D, d_ram, alu_out);
-                
-                // Destination
-                get_destination(instruction, alu_out,
-                    Regs.A, Regs.D, d_ram, write_out, outM, addressM);
+                    // Jump condition
+                    jump = get_jump_condition(alu_out, instruction);
 
-                // Jump condition
-                jump = get_jump_condition(alu_out, instruction);
-
-                // Update PC
-                updatePC(jump, Regs.PC, Regs.A, instruction);                
+                    // Update PC
+                    updatePC(jump, Regs.PC, Regs.A, instruction);                
+                    cinst_phase = 0;
+                }
             }
 
-            if (instruction == INST_FETCH_STOP) break;
+            //if (instruction == INST_FETCH_STOP) break; // This prevents achieving II=1.
         }
     }
 }

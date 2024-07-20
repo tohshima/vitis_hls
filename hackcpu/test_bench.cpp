@@ -116,7 +116,7 @@ int main() {
     read_rom_file("rom.bin", command_in, command_out);
 
     // Run CPU cycle
-    #if 0
+    #if 1
     // Run through
     command_in.write(SET_RESET_CONFIG);
     command_in.write(0);

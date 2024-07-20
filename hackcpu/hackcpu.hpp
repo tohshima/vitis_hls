@@ -6,6 +6,9 @@
 // A-instruction fall through mode (can be dual issue with the next instruction)
 //#define AINST_DUAL_ISSUE
 
+#define PIPELINE_II_1
+#define REDUCE_CINST_CYCLE
+
 // Define bit widths
 const int WORD_WIDTH = 16;
 const int ADDR_WIDTH = 15;
