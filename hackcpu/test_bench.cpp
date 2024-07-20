@@ -67,24 +67,26 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
         if (bitmap & DINFO_BIT_ADDRM)  std::cout << " addrM |";
         if (bitmap & DINFO_BIT_PC)  std::cout << "  PC   |";
         if (bitmap & DINFO_BIT_REGA)  std::cout << "   A   |";
-        if (bitmap & DINFO_BIT_REGD)  std::cout << "   D   |";
         if (bitmap & DINFO_BIT_ALUO)  std::cout << "  ALU  |";
         if (bitmap & DINFO_BIT_INST1) std::cout << " inst1 |";
         if (bitmap & DINFO_BIT_INST2)  std::cout << " inst2 |";
+        if (bitmap & DINFO_BIT_WOUT) std::cout << " wout |";
+        if (bitmap & DINFO_BIT_OUTM) std::cout << " outM  |";
+        if (bitmap & DINFO_BIT_ADDRM)  std::cout << " addrM |";
         if (bitmap) std::cout << std::endl;
     }
     char buf[32];
     if (bitmap) std::cout << "|";
     if (bitmap & DINFO_BIT_CYCLE) {sprintf(buf, "%6d |", dinfo.cycle); std::cout << buf; }
-    if (bitmap & DINFO_BIT_WOUT) {sprintf(buf, "%4d  |", dinfo.write_out.to_int()); std::cout << buf; }
-    if (bitmap & DINFO_BIT_OUTM) {sprintf(buf, "0x%04x |", dinfo.outM); std::cout << buf; }
-    if (bitmap & DINFO_BIT_ADDRM) {sprintf(buf, "0x%04x |", dinfo.addressM); std::cout << buf; }
     if (bitmap & DINFO_BIT_PC) {sprintf(buf, "0x%04x |", dinfo.pc); std::cout << buf; }
     if (bitmap & DINFO_BIT_REGA) {sprintf(buf, "0x%04x |", dinfo.regA); std::cout << buf; }
     if (bitmap & DINFO_BIT_REGD) {sprintf(buf, "0x%04x |", dinfo.regD); std::cout << buf; }
     if (bitmap & DINFO_BIT_ALUO) {sprintf(buf, "0x%04x |", dinfo.alu_out); std::cout << buf; }
     if (bitmap & DINFO_BIT_INST1) {sprintf(buf, "0x%04x |", dinfo.instruction1); std::cout << buf; }
     if (bitmap & DINFO_BIT_INST2) {sprintf(buf, "0x%04x |", dinfo.instruction2); std::cout << buf; }
+    if (bitmap & DINFO_BIT_WOUT) {sprintf(buf, "%4d  |", dinfo.write_out.to_int()); std::cout << buf; }
+    if (bitmap & DINFO_BIT_OUTM) {sprintf(buf, "0x%04x |", dinfo.outM); std::cout << buf; }
+    if (bitmap & DINFO_BIT_ADDRM) {sprintf(buf, "0x%04x |", dinfo.addressM); std::cout << buf; }
     
     if (bitmap) std::cout << std::endl;
 }
