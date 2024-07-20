@@ -76,7 +76,7 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
     char buf[32];
     if (bitmap) std::cout << "|";
     if (bitmap & DINFO_BIT_CYCLE) {sprintf(buf, "%6d |", dinfo.cycle); std::cout << buf; }
-    if (bitmap & DINFO_BIT_WOUT) {sprintf(buf, "%4d |", dinfo.write_out); std::cout << buf; }
+    if (bitmap & DINFO_BIT_WOUT) {sprintf(buf, "%4d  |", dinfo.write_out.to_int()); std::cout << buf; }
     if (bitmap & DINFO_BIT_OUTM) {sprintf(buf, "0x%04x |", dinfo.outM); std::cout << buf; }
     if (bitmap & DINFO_BIT_ADDRM) {sprintf(buf, "0x%04x |", dinfo.addressM); std::cout << buf; }
     if (bitmap & DINFO_BIT_PC) {sprintf(buf, "0x%04x |", dinfo.pc); std::cout << buf; }
@@ -91,7 +91,7 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
 
 int compare(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, bool header) {
 
-    word_t bitmap = DINFO_BIT_CYCLE | DINFO_BIT_PC | DINFO_BIT_INST1 | DINFO_BIT_INST2;
+    word_t bitmap = DINFO_BIT_CYCLE | DINFO_BIT_PC | DINFO_BIT_INST1 | DINFO_BIT_INST2 | DINFO_BIT_WOUT | DINFO_BIT_ADDRM | DINFO_BIT_OUTM;
     debug_s dinfo;
     get_debug_info(command_in, command_out, bitmap, dinfo);
     show_debug_info(bitmap, dinfo, header);
