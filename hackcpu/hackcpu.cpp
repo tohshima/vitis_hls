@@ -17,7 +17,7 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
 
     // Internal RAM
     static word_t ram[1 << ADDR_WIDTH];
-#pragma HLS RESOURCE variable=ram core=RAM_2P_BRAM
+#pragma HLS BIND_STORAGE variable=ram type=RAM_2P impl=BRAM
 
     // CPU registers
     static word_t A = 0, D = 0;
