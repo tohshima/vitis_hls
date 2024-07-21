@@ -1,11 +1,22 @@
 #include "hackcpu.hpp"
 
+// Predefined ROM
+static word_t rom_content[] = {
+    0b0000000000000010,
+    0b1110110000010000,
+    0b0000000000000011,
+    0b1110000010010000,
+    0b0000000000000000,
+    0b1110001100001000,
+};
+
+#define ROM_SIZE (sizeof(rom_content)/sizeof(rom_content[0]))
+
 // CPU function
-void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
+static void cpu(word_t rom[ROM_SIZE],
          ap_uint<1>& reset, ap_uint<1>& write_out, word_t& outM, addr_t& addressM, word_t& pc,
          word_t& debug_A, word_t& debug_D, word_t& debug_instruction) {
-#pragma HLS INTERFACE axis port=rom_in
-#pragma HLS INTERFACE axis port=rom_addr
+#pragma HLS INTERFACE ap_memory port=rom
 #pragma HLS INTERFACE ap_none port=reset
 #pragma HLS INTERFACE ap_none port=write_out
 #pragma HLS INTERFACE ap_none port=outM
@@ -36,12 +47,7 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
     }
 
     // Fetch instruction from ROM
-    axi_word_t rom_addr_out;
-    rom_addr_out.data = PC;
-    rom_addr.write(rom_addr_out);
-    
-    axi_word_t instruction_in = rom_in.read();
-    word_t instruction = instruction_in.data;
+    word_t instruction = rom[PC];
 
     // Decode and execute instruction
     bool is_a_instruction = (instruction[15] == 0);
@@ -114,4 +120,29 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
     debug_D = D;
     debug_instruction = instruction;
     pc = PC;
+}
+
+void cpu_wrapper(ap_uint<1>& write_out, word_t& outM, addr_t& addressM, word_t& pc,
+                 word_t& debug_A, word_t& debug_D, word_t& debug_instruction) {
+#pragma HLS INTERFACE ap_none port=write_out
+#pragma HLS INTERFACE ap_none port=outM
+#pragma HLS INTERFACE ap_none port=addressM
+#pragma HLS INTERFACE ap_none port=pc
+#pragma HLS INTERFACE ap_none port=debug_A
+#pragma HLS INTERFACE ap_none port=debug_D
+#pragma HLS INTERFACE ap_none port=debug_instruction
+#pragma HLS BIND_STORAGE variable=rom_content type=ROM_2P
+
+    // CPU interface signals
+    static ap_uint<1> reset = 1;
+
+    // Reset CPU
+    cpu(rom_content, reset, write_out, outM, addressM, pc, debug_A, debug_D, debug_instruction);
+
+    // Run simulation
+    reset = 0;
+    for (int cycle = 0; cycle < ROM_SIZE; ++cycle) {
+        // Run CPU cycle
+        cpu(rom_content, reset, write_out, outM, addressM, pc, debug_A, debug_D, debug_instruction);
+    }
 }

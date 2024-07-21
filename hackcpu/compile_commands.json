@@ -5,7 +5,7 @@
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
       "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
-      "",
+      "-DALLOW_EMPTY_HLS_STREAM_READS",
       "-c",
       "C:\\Users\\tetsu\\vitis_hls\\hackcpu\\hackcpu.cpp"
     ],
