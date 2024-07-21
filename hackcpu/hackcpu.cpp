@@ -49,16 +49,29 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
         bool jump = false;
 
         // ALU computation
-        switch (instruction(12, 10)) {
-            case 0b000: alu_out = D & A; break;
-            case 0b001: alu_out = D | A; break;
-            case 0b010: alu_out = D + A; break;
-            case 0b011: alu_out = D - A; break;
-            case 0b100: alu_out = D & ram[A]; break;
-            case 0b101: alu_out = D | ram[A]; break;
-            case 0b110: alu_out = D + ram[A]; break;
-            case 0b111: alu_out = D - ram[A]; break;
-            default: alu_out = 0;
+        word_t x = D;
+        word_t y = instruction[12] ? ram[A] : A;  // A/M bit
+
+        switch (instruction(11, 6)) {
+            case 0b101010: alu_out = 0; break;                    // 0
+            case 0b111111: alu_out = 1; break;                    // 1
+            case 0b111010: alu_out = -1; break;                   // -1
+            case 0b001100: alu_out = x; break;                    // D
+            case 0b110000: alu_out = y; break;                    // A/M
+            case 0b001101: alu_out = ~x; break;                   // !D
+            case 0b110001: alu_out = ~y; break;                   // !A/M
+            case 0b001111: alu_out = -x; break;                   // -D
+            case 0b110011: alu_out = -y; break;                   // -A/M
+            case 0b011111: alu_out = x + 1; break;                // D+1
+            case 0b110111: alu_out = y + 1; break;                // A/M+1
+            case 0b001110: alu_out = x - 1; break;                // D-1
+            case 0b110010: alu_out = y - 1; break;                // A/M-1
+            case 0b000010: alu_out = x + y; break;                // D+A/M
+            case 0b010011: alu_out = x - y; break;                // D-A/M
+            case 0b000111: alu_out = y - x; break;                // A/M-D
+            case 0b000000: alu_out = x & y; break;                // D&A/M
+            case 0b010101: alu_out = x | y; break;                // D|A/M
+            default: alu_out = 0; // Undefined behavior
         }
 
         // Destination
