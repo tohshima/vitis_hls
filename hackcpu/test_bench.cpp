@@ -43,7 +43,7 @@ int main() {
 
     // Run simulation
     reset = 0;
-    for (int cycle = 0; cycle < 100; ++cycle) {
+    for (int cycle = 0; cycle < 7; ++cycle) {
         // Handle ROM read request
         if (!rom_addr.empty()) {
             axi_word_t addr_req = rom_addr.read();

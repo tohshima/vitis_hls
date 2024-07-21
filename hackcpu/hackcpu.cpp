@@ -27,10 +27,11 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
         A = 0;
         D = 0;
         PC = 0;
-        // Request first instruction
-        axi_word_t rom_addr_out;
-        rom_addr_out.data = PC;
-        rom_addr.write(rom_addr_out);
+        // Update debug information
+        debug_A = A;
+        debug_D = D;
+        debug_instruction = 0; // No instruction on reset
+        pc = PC;
         return;
     }
 
@@ -47,6 +48,7 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
     
     if (is_a_instruction) {
         A = instruction;
+        PC++;
     } else {
         // C-instruction
         word_t alu_out;
@@ -107,13 +109,9 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
         }
     }
 
-    if (!is_a_instruction) {
-        PC++;
-    }
-    
     // Update debug information
-    pc = PC;
     debug_A = A;
     debug_D = D;
     debug_instruction = instruction;
+    pc = PC;
 }
