@@ -27,6 +27,10 @@ void cpu(hls::stream<axi_word_t>& rom_in, hls::stream<axi_word_t>& rom_addr,
         A = 0;
         D = 0;
         PC = 0;
+        // Request first instruction
+        axi_word_t rom_addr_out;
+        rom_addr_out.data = PC;
+        rom_addr.write(rom_addr_out);
         return;
     }
 
