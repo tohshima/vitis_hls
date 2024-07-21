@@ -8,6 +8,7 @@ static word_t rom_content[] = {
     0b1110000010010000,
     0b0000000000000000,
     0b1110001100001000,
+    0b1110000000000111
 };
 
 #define ROM_SIZE (sizeof(rom_content)/sizeof(rom_content[0]))
@@ -25,6 +26,7 @@ static void cpu(word_t rom[ROM_SIZE],
 #pragma HLS INTERFACE ap_none port=debug_A
 #pragma HLS INTERFACE ap_none port=debug_D
 #pragma HLS INTERFACE ap_none port=debug_instruction
+#pragma HLS INTERFACE ap_none port=return
 
     // Internal RAM
     static word_t ram[1 << ADDR_WIDTH];
