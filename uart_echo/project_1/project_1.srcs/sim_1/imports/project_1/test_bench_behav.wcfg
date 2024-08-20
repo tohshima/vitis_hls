@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="test_bench_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="ipif_pkg" />
+            <top_module name="lib_pkg" />
+            <top_module name="test_bench" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="22.500000 us"></ZoomStartTime>
+      <ZoomEndTime time="62.250001 us"></ZoomEndTime>
+      <Cursor1Time time="6.350000 us"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="533"></NameColumnWidth>
+      <ValueColumnWidth column_width="219"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="15" />
+   <wvobject fp_name="/test_bench/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/rst_n" type="logic">
+      <obj_property name="ElementShortName">rst_n</obj_property>
+      <obj_property name="ObjectShortName">rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/rst_clk_wiz_100M_peripheral_aresetn" type="array">
+      <obj_property name="ElementShortName">rst_clk_wiz_100M_peripheral_aresetn[0:0]</obj_property>
+      <obj_property name="ObjectShortName">rst_clk_wiz_100M_peripheral_aresetn[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/rx" type="logic">
+      <obj_property name="ElementShortName">rx</obj_property>
+      <obj_property name="ObjectShortName">rx</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/tx" type="logic">
+      <obj_property name="ElementShortName">tx</obj_property>
+      <obj_property name="ObjectShortName">tx</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/tx_data" type="array">
+      <obj_property name="ElementShortName">tx_data[7:0]</obj_property>
+      <obj_property name="ObjectShortName">tx_data[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/tx_start" type="logic">
+      <obj_property name="ElementShortName">tx_start</obj_property>
+      <obj_property name="ObjectShortName">tx_start</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/i" type="array">
+      <obj_property name="ElementShortName">i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/uart_echo_0_debug_phase_s" type="array">
+      <obj_property name="ElementShortName">uart_echo_0_debug_phase_s[31:0]</obj_property>
+      <obj_property name="ObjectShortName">uart_echo_0_debug_phase_s[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/uart_echo_0_debug_rx_data_s" type="array">
+      <obj_property name="ElementShortName">uart_echo_0_debug_rx_data_s[7:0]</obj_property>
+      <obj_property name="ObjectShortName">uart_echo_0_debug_rx_data_s[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/uart_echo_0_m_axi_AXIM_AWADDR" type="array">
+      <obj_property name="ElementShortName">uart_echo_0_m_axi_AXIM_AWADDR[63:0]</obj_property>
+      <obj_property name="ObjectShortName">uart_echo_0_m_axi_AXIM_AWADDR[63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/uart_echo_0_m_axi_AXIM_WDATA" type="array">
+      <obj_property name="ElementShortName">uart_echo_0_m_axi_AXIM_WDATA[31:0]</obj_property>
+      <obj_property name="ObjectShortName">uart_echo_0_m_axi_AXIM_WDATA[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/uart_echo_0_m_axi_AXIM_ARADDR" type="array">
+      <obj_property name="ElementShortName">uart_echo_0_m_axi_AXIM_ARADDR[63:0]</obj_property>
+      <obj_property name="ObjectShortName">uart_echo_0_m_axi_AXIM_ARADDR[63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/uart_echo_0_m_axi_AXIM_RDATA" type="array">
+      <obj_property name="ElementShortName">uart_echo_0_m_axi_AXIM_RDATA[31:0]</obj_property>
+      <obj_property name="ObjectShortName">uart_echo_0_m_axi_AXIM_RDATA[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/test_bench/design_1_wrapper/design_1_i/axi_uartlite_0_interrupt" type="logic">
+      <obj_property name="ElementShortName">axi_uartlite_0_interrupt</obj_property>
+      <obj_property name="ObjectShortName">axi_uartlite_0_interrupt</obj_property>
+   </wvobject>
+</wave_config>

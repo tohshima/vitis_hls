@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<autopilotfilemapping:AutoPilotFileMapping xmlns:autopilotfilemapping="www.autoesl.com/autopilotfilemapping">
+  <source>
+    <originFiles name="uart_echo.hpp" path="C:\Users\tetsu\vitis_hls\uart_echo\uart_echo.hpp"/>
+    <originFiles name="uart_echo.cpp" path="C:\Users\tetsu\vitis_hls\uart_echo\uart_echo.cpp"/>
+  </source>
+  <testbench>
+    <originFiles name="test_bench.cpp" path="C:\Users\tetsu\vitis_hls\uart_echo\test_bench.cpp"/>
+  </testbench>
+</autopilotfilemapping:AutoPilotFileMapping>
