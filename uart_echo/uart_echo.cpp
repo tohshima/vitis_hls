@@ -37,14 +37,17 @@ void uart_echo(
 		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ソフトウェアリセット
 		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
 		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
+
 	} else if (start && debug_injection) {
+
 		// TXFIFOが満杯でないか確認
 		while ((uart_reg[STAT_REG_OFFSET] & 0x00000008)) {};
 		// データをTXFIFOに書き込む
 		uart_reg[TX_FIFO_OFFSET] = rx_data+1;
 		debug_phase_ = phase = 10;
-	}else if (start) {
-	}
+
+	} else if (start) {
+
 		debug_phase_ = phase = 6;
 		// RXFIFOからデータを読み取る
 		while((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 0) {}

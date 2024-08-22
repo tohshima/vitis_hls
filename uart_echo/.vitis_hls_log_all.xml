@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vivadoHLSLog:LogRoot xmlns:vivadoHLSLog="www.xilinx.com/vivadoHLSLog">
+  <errorLogs>
+    <logs>
+      <synLog/>
+    </logs>
+  </errorLogs>
+  <warningLogs>
+    <logs>
+      <synLog>
+        <logs message="WARNING: [RTGEN 206-101] Port 'uart_echo/interrupt_r' has no fanin or fanout and is left dangling.&#xD;&#xA;               Please use C simulation to confirm this function argument can be read from or written to." projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:53.758+0900" type="Warning"/>
+        <logs message="WARNING: [RTGEN 206-101] Register 'initialized' is power-on initialization." projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:53.633+0900" type="Warning"/>
+        <logs message="WARNING: [RTGEN 206-101] Port 'debug_rx_data_s' with mode 'ap_none' may require an associated data valid signal to correctly communicate with other blocks or a test bench; automatic C/RTL co-simulation may not be able to verify such a port." projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:53.502+0900" type="Warning"/>
+        <logs message="WARNING: [RTGEN 206-101] Port 'debug_phase_s' with mode 'ap_none' may require an associated data valid signal to correctly communicate with other blocks or a test bench; automatic C/RTL co-simulation may not be able to verify such a port." projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:53.394+0900" type="Warning"/>
+        <logs message="WARNING: [RTGEN 206-101] Design contains AXI ports. Reset is fixed to synchronous and active low." projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:53.195+0900" type="Warning"/>
+        <logs message="WARNING: [HLS 200-878] Unable to schedule the loop exit test ('bitselect' operation ('tmp', uart_echo/uart_echo.cpp:59)) in the first pipeline iteration (II = 7 cycles).&#xD;&#xA;Resolution: For help on HLS 200-878 see www.xilinx.com/cgi-bin/docs/rdoc?v=2022.2;t=hls+guidance;d=200-878.html" projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:51.335+0900" type="Warning"/>
+        <logs message="WARNING: [HLS 200-878] Unable to schedule the loop exit test ('bitselect' operation ('tmp', uart_echo/uart_echo.cpp:59)) in the first pipeline iteration (II = 4 cycles).&#xD;&#xA;Resolution: For help on HLS 200-878 see www.xilinx.com/cgi-bin/docs/rdoc?v=2022.2;t=hls+guidance;d=200-878.html" projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:51.296+0900" type="Warning"/>
+        <logs message="WARNING: [HLS 200-878] Unable to schedule the loop exit test ('bitselect' operation ('tmp', uart_echo/uart_echo.cpp:59)) in the first pipeline iteration (II = 3 cycles).&#xD;&#xA;Resolution: For help on HLS 200-878 see www.xilinx.com/cgi-bin/docs/rdoc?v=2022.2;t=hls+guidance;d=200-878.html" projectName="uart_echo" solutionName="solution1" date="2024-08-22T02:18:51.231+0900" type="Warning"/>
+      </synLog>
+    </logs>
+  </warningLogs>
+</vivadoHLSLog:LogRoot>

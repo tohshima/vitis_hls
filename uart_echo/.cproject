@@ -171,11 +171,11 @@
                                 								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/include/ap_sysc"/>
                                 								
-                                <listOptionValue builtIn="false" value="C:/Users/tetsu/vitis_hls"/>
-                                								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/include/etc"/>
                                 								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/win64/tools/auto_cc/include"/>
+                                								
+                                <listOptionValue builtIn="false" value="C:/Users/tetsu/vitis_hls/work/uart_echo"/>
                                 								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/include"/>
                                 								
@@ -353,11 +353,11 @@
                                 								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/include/ap_sysc"/>
                                 								
-                                <listOptionValue builtIn="false" value="C:/Users/tetsu/vitis_hls"/>
-                                								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/include/etc"/>
                                 								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/win64/tools/auto_cc/include"/>
+                                								
+                                <listOptionValue builtIn="false" value="C:/Users/tetsu/vitis_hls/work/uart_echo"/>
                                 								
                                 <listOptionValue builtIn="false" value="E:/Xilinx/Vitis_HLS/2022.2/include"/>
                                 								

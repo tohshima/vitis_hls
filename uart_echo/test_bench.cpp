@@ -24,7 +24,7 @@ int main() {
     uart_comm uart_comm("\\\\.\\"USE_COM);  // COM2ポートを開く
 #endif
 
-    uart_echo(true, 0, uart_regs, debug_phase, debug_rx_data);
+    uart_echo(true, 0, uart_regs, debug_phase, debug_rx_data, debug_injection);
 
     // 制御レジスタの確認
 #if 0
