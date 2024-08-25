@@ -13,7 +13,7 @@ public:
     ~uart_comm();
 
     bool write_data(const char* data, size_t length);
-    bool read_data(char* buffer, size_t bufferSize, DWORD& bytesRead);
+    bool read_data(char* buffer, size_t buffer_size, DWORD& bytes_read);
 };
 
 #if 0
