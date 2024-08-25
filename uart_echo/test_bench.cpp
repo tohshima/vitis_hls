@@ -5,7 +5,7 @@
 #include <ap_int.h>
 #include "uart_echo.hpp"
 
-//#define INPUT_FROM_COM
+#define INPUT_FROM_COM
 #define USE_COM "COM2"
 
 #include "../common/uart_comm.hpp"
