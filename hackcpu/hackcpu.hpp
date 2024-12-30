@@ -4,7 +4,7 @@
 #include <ap_axi_sdata.h>
 
 // A-instruction fall through mode (can be dual issue with the next instruction)
-//#define AINST_DUAL_ISSUE
+#define AINST_DUAL_ISSUE
 
 //#define PIPELINE_II_1
 //#define REDUCE_CINST_CYCLE
