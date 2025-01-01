@@ -69,16 +69,20 @@ static bool get_jump_condition(word_t alu_out, word_t instruction) {
     return false;
 }
 
-static void updatePC(bool jump, addr_t& PC, word_t& A,
+static bool updatePC(bool jump, addr_t& PC, word_t& A,
                      word_t instruction) {
 #pragma HLS inline
+	bool break_cond = false;
     if (jump) {
         PC = A;
     } else {
-        if (instruction != INST_FETCH_STOP) {
+        if (instruction == INST_FETCH_STOP) {
+        	break_cond = true;
+        } else {
             PC++;
         }
     }
+    return break_cond;
 }
 
 // CPU registers
@@ -102,13 +106,17 @@ static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
 static word_t break_condition_bitmap = 0;
 
+static bool disp_out_check(ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap) {
+	bool break_condition = (write_out && (addressM >= 0x4000)) && (break_condition_bitmap | BREAK_CONDITION_BIT_DISPOUT);
+	return break_condition;
+}
+
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
 //       Separate M load 
 static void cpu(word_t i_ram[IRAM_SIZE],
          word_t d_ram[DRAM_SIZE],
-         ap_uint<1>& reset,
-         hls::stream<unsigned int> uart_regs[4]) {
+         ap_uint<1>& reset) {
 #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
 #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
 #pragma HLS INTERFACE ap_none port=reset
@@ -189,46 +197,27 @@ static void cpu(word_t i_ram[IRAM_SIZE],
                     addressM = Regs.A;
                     get_destination(instruction, alu_out,
                         Regs.A, Regs.D, d_ram, write_out, outM, addressM);
-                    if (write_out && (addressM >= 0x4000)) {
-                        char send_chars[10];
-                        unsigned short addr = addressM - 0x4000;
-                        send_chars[0] = '!';
-                        for (int i = 1; i <= 4; i++) {
-                            char temp = ((addr >> (4-i)*4) & 0xF);
-                            send_chars[i] = (temp <= 9)? temp + '0': temp-10 + 'A';
-                        }
-                        for (int i = 5; i <= 8; i++) {
-                            char temp = ((outM >> (8-i)*4) & 0xF);
-                            send_chars[i] = (temp <= 9)? temp + '0': temp-10 + 'A';
-                        }
-                        send_chars[9] = '\n';
-                        for (int i = 0; i < sizeof(send_chars); i++) {
-                            while (uart_regs[1].full()) {}
-                            uart_regs[1].write(send_chars[i]);
-                        }
-                        if (break_condition_bitmap | BREAK_CONDITION_BIT_DISPOUT) {
-                            break_condition = true;
-                        }
-                    }
+                    break_condition = disp_out_check(write_out, addressM, break_condition_bitmap);
 
                     // Jump condition
                     jump = get_jump_condition(alu_out, instruction);
 
                     // Update PC
-                    updatePC(jump, Regs.PC, Regs.A, instruction);                
+                    break_condition = updatePC(jump, Regs.PC, Regs.A, instruction);
                     cinst_phase = 0;
 #ifdef PIPELINE_II_1
                 }
 #endif
             }
         }
-        if (break_condition) cycle++;
+        if (break_condition) {
+        	cycle++;
+        }
     }
 }
 
 void cpu_wrapper(hls::stream<word_t>& command_packet_in,
-                 hls::stream<word_t>& command_packet_out,
-                 hls::stream<unsigned int> uart_regs[4]) {
+                 hls::stream<word_t>& command_packet_out) {
                     
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
@@ -251,9 +240,11 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
         switch(command) {
             case NORMAL_OPERATION:
                 cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
+                halt = 0;
                 break;
             case SET_RESET_CONFIG:
             {
+            	while(command_packet_in.empty()) {}
                 word_t bitmap = command_packet_in.read();
                 reset = (bitmap & RESET_BIT_RESET)? 1: 0;
                 halt = (bitmap & RESET_BIT_HALT)? 1: 0;
@@ -269,16 +260,21 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             }
             case WRITE_TO_IRAM: 
             {
+            	while(command_packet_in.empty()) {}
                 addr_t address = (addr_t)command_packet_in.read();
+            	while(command_packet_in.empty()) {}
                 word_t data = command_packet_in.read();
                 i_ram[address] = data;
                 break;
             }
             case LOAD_TO_IRAM: 
             {
+            	while(command_packet_in.empty()) {}
                 addr_t address = (addr_t)command_packet_in.read();
+            	while(command_packet_in.empty()) {}
                 word_t length = command_packet_in.read();
                 for (word_t i = 0; i < length; i++) {
+                	while(command_packet_in.empty()) {}
                     word_t data = command_packet_in.read();
                     i_ram[address+i] = data;
                 }
@@ -286,13 +282,16 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             }
             case WRITE_TO_DRAM: 
             {
+            	while(command_packet_in.empty()) {}
                 addr_t address = (addr_t)command_packet_in.read();
+            	while(command_packet_in.empty()) {}
                 word_t data = command_packet_in.read();
                 d_ram[address] = data;
                 break;
             }
             case READ_FROM_DRAM: 
             {
+            	while(command_packet_in.empty()) {}
                 addr_t address = (addr_t)command_packet_in.read();
                 command_packet_out.write(d_ram[address]);
                 break;
@@ -302,10 +301,18 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 halt = 0;
                 break;
             case SET_BREAK_CONDITION:
+            	while(command_packet_in.empty()) {}
                 break_condition_bitmap = command_packet_in.read();
+                break;
+            case MULTI_STEP_EXECUTION:
+            	while(command_packet_in.empty()) {}
+                word_t steps = command_packet_in.read();
+                cycle_to_stop = cycle+steps;
+                halt = 0;
                 break;
             case GET_DEBUG_INFO:
             {
+            	while(command_packet_in.empty()) {}
                 word_t bitmap = command_packet_in.read();
                 if (bitmap & DINFO_BIT_CYCLE) {
                     command_packet_out.write(cycle & 0xFFFF);
@@ -330,7 +337,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 break;
         }
         if (reset || !halt) {
-            cpu(i_ram, d_ram, reset, uart_regs);
+            cpu(i_ram, d_ram, reset);
         }
     }
 }

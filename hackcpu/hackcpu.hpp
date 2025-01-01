@@ -39,6 +39,7 @@ typedef enum {
     DUMP_FROM_DRAM      = 0x0022,
     STEP_EXECUTION      = 0x8000,
     SET_BREAK_CONDITION = 0x8001,
+    MULTI_STEP_EXECUTION= 0x8002,
     GET_DEBUG_INFO      = 0x8010,
 } control_command_e;
 
@@ -81,7 +82,6 @@ typedef struct {
 } debug_s;
 
 void cpu_wrapper(hls::stream<word_t>& command_packet_in,
-                 hls::stream<word_t>& command_packet_out,
-                 hls::stream<unsigned int> uart_regs[4]);
+                 hls::stream<word_t>& command_packet_out);
 
 

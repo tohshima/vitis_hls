@@ -13,8 +13,7 @@
 
 void read_rom_file(const std::string& filename,
              hls::stream<word_t>& command_in,
-             hls::stream<word_t>& command_out,
-             hls::stream<unsigned int> uart_regs[4]) {
+             hls::stream<word_t>& command_out) {
     std::ifstream file(filename);
     std::string line;
 
@@ -35,15 +34,15 @@ void read_rom_file(const std::string& filename,
     for (int i = 0; i < length; i++) {
         command_in.write(tmp[i]);
     }
-    cpu_wrapper(command_in, command_out, uart_regs);
+    cpu_wrapper(command_in, command_out);
 }
 
-void get_debug_info(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, word_t bitmap, debug_s& dinfo, hls::stream<unsigned int> uart_regs[4]) {
+void get_debug_info(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, word_t bitmap, debug_s& dinfo) {
     command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_HALT);
     command_in.write(GET_DEBUG_INFO);
     command_in.write(bitmap);
-    cpu_wrapper(command_in, command_out, uart_regs);
+    cpu_wrapper(command_in, command_out);
     
     if (bitmap & DINFO_BIT_CYCLE) {
         uint64_t cycle = 0;
@@ -111,15 +110,75 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
     if (bitmap) std::cout << std::endl;
 }
 
-int compare(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, bool header, hls::stream<unsigned int> uart_regs[4]) {
+static void disp_out_via_uart(uart_comm& uart_comm, debug_s& dinfo) {
+	if (dinfo.write_out && (dinfo.addressM >= 0x4000)) {
+		char send_chars[10];
+		unsigned short addr = dinfo.addressM - 0x4000;
+		send_chars[0] = '!';
+		for (int i = 1; i <= 4; i++) {
+			char temp = ((addr >> (4 - i) * 4) & 0xF);
+			send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+		}
+		for (int i = 5; i <= 8; i++) {
+			char temp = ((dinfo.outM >> (8 - i) * 4) & 0xF);
+			send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+		}
+		send_chars[9] = '\n';
+		send_chars[10] = '\0';
+        uart_comm.write_data(send_chars, strlen(send_chars));
+	}
+}
+
+int compare(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, bool header, uart_comm& uart_comm) {
 
     word_t bitmap = DINFO_BIT_CYCLE | DINFO_BIT_PC | DINFO_BIT_REGA | DINFO_BIT_REGD |
     		        DINFO_BIT_INST1 | DINFO_BIT_INST2 | DINFO_BIT_WOUT |
     		        DINFO_BIT_ADDRM | DINFO_BIT_OUTM | DINFO_BIT_SP;
     debug_s dinfo;
-    get_debug_info(command_in, command_out, bitmap, dinfo, uart_regs);
+    get_debug_info(command_in, command_out, bitmap, dinfo);
     show_debug_info(bitmap, dinfo, header);
+    disp_out_via_uart(uart_comm, dinfo);
     return 0;
+}
+
+static void uart_bridge(uart_comm& uart_comm, hls::stream<word_t>& command_in, hls::stream<word_t>& command_out) {
+	char read_buf[4] = {0};
+	DWORD bytes_read;
+	while (1) {
+		if (uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) {
+			if (bytes_read == 4) {
+				if (read_buf[0] == 'Z') {
+					cpu_wrapper(command_in, command_out);
+				} else {
+					word_t send_data = 0;
+					for (int i = 0; i < 4; i++) {
+						if ((read_buf[i] >= '0') && (read_buf[i] <= '9')) send_data += ((read_buf[i]-'0') << (3-i)*4);
+						else if ((read_buf[i] >= 'a') && (read_buf[i] <= 'f')) send_data += ((read_buf[i]-'a'+10) << (3-i)*4);
+						else if ((read_buf[i] >= 'A') && (read_buf[i] <= 'F')) send_data += ((read_buf[i]-'A'+10) << (3-i)*4);
+					}
+					char buf[16];
+					sprintf(buf, "snd: %04x", send_data);
+					std::cout << buf << std::endl;
+					command_in.write(send_data);
+				}
+			}
+		}
+		while (!command_out.empty()) {
+			word_t read_data = command_out.read();
+			int data = read_data.to_uint();
+			char buf[16];
+			sprintf(buf, "rcv: %04x", data);
+			std::cout << buf << std::endl << std::flush;
+			char send_chars[6];
+			for (int i = 0; i < 4; i++) {
+				char temp = ((data >> (3 - i) * 4) & 0xF);
+				send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
+			}
+			send_chars[4] = '\n';
+			send_chars[5] = '\0';
+	        uart_comm.write_data(send_chars, strlen(send_chars));
+		}
+	}
 }
 
 int main() {
@@ -129,49 +188,46 @@ int main() {
     // CPU interface signals
     hls::stream<word_t> command_in;
     hls::stream<word_t> command_out;
-    hls::stream<unsigned int> uart_regs[4];
 
+ #if 1
     // Reset CPU
     command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_RESET | RESET_BIT_HALT);
-    cpu_wrapper(command_in, command_out, uart_regs);
+    cpu_wrapper(command_in, command_out);
     command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_HALT);
-    cpu_wrapper(command_in, command_out, uart_regs);
+    cpu_wrapper(command_in, command_out);
 
     // Write to ROM
     // Read ROM content from file
-    //read_rom_file("rom.bin", command_in, command_out, uart_regs);
-    read_rom_file("rom_string_test.bin", command_in, command_out, uart_regs);
+    read_rom_file("rom_string_test.bin", command_in, command_out);
     command_in.write(WRITE_TO_DRAM);
 
     // For rect example
     command_in.write(0x0000);
     command_in.write(0x0014);
 
+    command_in.write(STEP_EXECUTION);
+    cpu_wrapper(command_in, command_out);
+#endif
+
+#if 1
+    uart_bridge(uart_comm, command_in, command_out);
+
+#else
+
     // Run CPU cycle
     #if 0
     // Run through
     command_in.write(SET_RESET_CONFIG);
     command_in.write(0);
-    cpu_wrapper(command_in, command_out, uart_regs);
-    #elif 1
+    cpu_wrapper(command_in, command_out);
+    #elif 0
     // Step debugging
     for (int i = 0; i < 5000000; i++) {
         command_in.write(STEP_EXECUTION);
-        cpu_wrapper(command_in, command_out, uart_regs);
-        compare(command_in, command_out, (i == 0), uart_regs);
-        if (!uart_regs[1].empty()) {
-        	char str[32] = {0};
-        	int s = 0;
-            while (!uart_regs[1].empty()) {
-            	char c = uart_regs[1].read();
-            	str[s++] = c;
-            	std::cout << c;
-            }
-            std::cout << std::endl;
-            uart_comm.write_data(str, strlen(str));
-        }
+        cpu_wrapper(command_in, command_out);
+        compare(command_in, command_out, (i == 0), uart_comm);
    }
     #else
     // Run until mem out
@@ -179,9 +235,10 @@ int main() {
     command_in.write(BREAK_CONDITION_BIT_DISPOUT);
     command_in.write(SET_RESET_CONFIG);
     command_in.write(0);
-    for (int i = 0; i < 200; i++) {
-        cpu_wrapper(command_in, command_out, uart_regs);
-        compare(command_in, command_out, (i == 0), uart_regs);
+    for (int i = 0; i < 2000; i++) {
+        command_in.write(NORMAL_OPERATION);
+        cpu_wrapper(command_in, command_out);
+        compare(command_in, command_out, (i == 0), uart_comm);
      }
     #endif
 
@@ -189,9 +246,10 @@ int main() {
     command_in.write(RESET_BIT_HALT);
     command_in.write(READ_FROM_DRAM);
     command_in.write(0x0007);
-    cpu_wrapper(command_in, command_out, uart_regs);
+    cpu_wrapper(command_in, command_out);
     word_t val = command_out.read();
     std::cout << "Read val: " << val << std::endl;
     //if (val != 0x0008) return 1;
+#endif
     return 0;
 }
