@@ -305,11 +305,13 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 break_condition_bitmap = command_packet_in.read();
                 break;
             case MULTI_STEP_EXECUTION:
+            {
             	while(command_packet_in.empty()) {}
                 word_t steps = command_packet_in.read();
                 cycle_to_stop = cycle+steps;
                 halt = 0;
                 break;
+            }
             case GET_DEBUG_INFO:
             {
             	while(command_packet_in.empty()) {}
