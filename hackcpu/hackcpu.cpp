@@ -203,7 +203,7 @@ static void cpu(word_t i_ram[IRAM_SIZE],
                     jump = get_jump_condition(alu_out, instruction);
 
                     // Update PC
-                    break_condition = updatePC(jump, Regs.PC, Regs.A, instruction);
+                    break_condition |= updatePC(jump, Regs.PC, Regs.A, instruction);
                     cinst_phase = 0;
 #ifdef PIPELINE_II_1
                 }
