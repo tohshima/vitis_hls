@@ -107,8 +107,12 @@ static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
 static word_t break_condition_bitmap = 0;
 
 static bool disp_out_check(ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap) {
-	bool break_condition = (write_out && (addressM >= 0x4000)) && (break_condition_bitmap | BREAK_CONDITION_BIT_DISPOUT);
-	return break_condition;
+	if (break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) {
+		if (write_out && (addressM >= 0x4000)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 // CPU function
