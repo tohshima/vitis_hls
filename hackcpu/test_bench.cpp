@@ -116,7 +116,7 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
 
 static void disp_out_via_uart(uart_comm& uart_comm, word_t addrM, word_t dataM) {
 	if (addrM >= 0x4000) {
-		char send_chars[10];
+		char send_chars[11];
 		unsigned short addr = addrM - 0x4000;
 		send_chars[0] = '!';
 		for (int i = 1; i <= 4; i++) {
@@ -174,37 +174,38 @@ static void uart_bridge(uart_comm& uart_comm, hls::stream<word_t>& command_in, h
 			if (bytes_read == 4) {
 				if (read_buf[0] == 'Z') {
 					// é¿çs
-					cpu_wrapper(command_in, command_out);
-					while (command_out.empty()) {}
-					while (!command_out.empty()) {
-						word_t num_retvals = command_out.read();
-						char buf[16];
-						sprintf(buf, "nrv: %04x", num_retvals);
-						std::cout << buf << std::endl;
-						char send_chars[6];
-						make_hex_chars(num_retvals, send_chars);
-						uart_comm.write_data(send_chars, strlen(send_chars));
-
+					word_t num_retvals = 0;
+					word_t read_data[16];
+					word_t reason = 0;
+					while (1) {
+						cpu_wrapper(command_in, command_out);
+						while (command_out.empty()) {}
+						num_retvals = command_out.read();
 						for (int i = 0; i < num_retvals; i++) {
-							word_t read_data = command_out.read();
-							int data = read_data.to_uint();
-							sprintf(buf, "rcv: %04x", data);
-							std::cout << buf << std::endl;
-							make_hex_chars(data, send_chars);
-							uart_comm.write_data(send_chars, strlen(send_chars));
+							read_data[i] = command_out.read();
 						}
-						word_t reason = command_out.read();
-						sprintf(buf, "rsn: %04x", reason);
-						std::cout << buf << std::endl;
-						make_hex_chars(reason, send_chars);
-				        uart_comm.write_data(send_chars, strlen(send_chars));
+						reason = command_out.read();
+						if (reason == BREAK_REASON_DISP) {
+							word_t addr = command_out.read();
+							word_t data = command_out.read();
+							disp_out_via_uart(uart_comm, addr, data);
 
-				        if (reason == BREAK_REASON_DISP) {
-				        	word_t addr = command_out.read();
-				        	word_t data = command_out.read();
-				        	disp_out_via_uart(uart_comm, addr, data);
-				        }
+							// auto continue
+							command_in.write(NORMAL_OPERATION);
+						} else {
+							break;
+						}
 					}
+
+					char send_chars[6];
+					make_hex_chars(num_retvals, send_chars);
+					uart_comm.write_data(send_chars, strlen(send_chars));
+					for (int i = 0; i < num_retvals; i++) {
+						make_hex_chars(read_data[i].to_uint(), send_chars);
+						uart_comm.write_data(send_chars, strlen(send_chars));
+					}
+					make_hex_chars(reason, send_chars);
+					uart_comm.write_data(send_chars, strlen(send_chars));
 				} else {
 					word_t send_data = make_hex_bin(read_buf);
 					char buf[16];
