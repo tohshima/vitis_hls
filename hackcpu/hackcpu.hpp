@@ -20,6 +20,15 @@ const int TRARCE_SIZE = 32;
 #define INST_FETCH_STOP 0x8000
 #define INST_NO_DUAL    0x8001
 
+// Break reason
+typedef enum {
+	BREAK_REASON_NOP   = 0x8800,
+	BREAK_REASON_RESET = 0x8801,
+	BREAK_REASON_CYCLE = 0x8802,
+	BREAK_REASON_STOP  = 0x8804,
+	BREAK_REASON_DISP  = 0x8808
+} break_reason_e;
+
 // Define CPU components
 typedef ap_uint<WORD_WIDTH> word_t;
 typedef ap_int<WORD_WIDTH> sword_t;

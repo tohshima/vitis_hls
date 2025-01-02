@@ -118,7 +118,7 @@ static bool disp_out_check(ap_uint<1> write_out, addr_t addressM, word_t break_c
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
 //       Separate M load 
-static void cpu(word_t i_ram[IRAM_SIZE],
+static word_t cpu(word_t i_ram[IRAM_SIZE],
          word_t d_ram[DRAM_SIZE],
          ap_uint<1>& reset) {
 #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
@@ -126,16 +126,16 @@ static void cpu(word_t i_ram[IRAM_SIZE],
 #pragma HLS INTERFACE ap_none port=reset
 #pragma HLS INTERFACE m_axi port=uart_regs depth=32
 
-	bool break_condition = false;
+	word_t break_reason = BREAK_REASON_CYCLE;
     if (reset) {
         Regs.A = 0;
         Regs.D = 0;
         Regs.PC = 0;
         cycle = 0;
         write_out = 0;
-        return;
+        return BREAK_REASON_RESET;
     } else {
-        for (; cycle < cycle_to_stop && !break_condition; cycle++) {
+        for (; cycle < cycle_to_stop && (break_reason == BREAK_REASON_CYCLE); cycle++) {
             #ifdef PIPELINE_II_1
             #pragma HLS PIPELINE II=1
             #else
@@ -201,23 +201,38 @@ static void cpu(word_t i_ram[IRAM_SIZE],
                     addressM = Regs.A;
                     get_destination(instruction, alu_out,
                         Regs.A, Regs.D, d_ram, write_out, outM, addressM);
-                    break_condition = disp_out_check(write_out, addressM, break_condition_bitmap);
+                    if (disp_out_check(write_out, addressM, break_condition_bitmap)) {
+                    	break_reason = BREAK_REASON_DISP;
+                    }
 
                     // Jump condition
                     jump = get_jump_condition(alu_out, instruction);
 
                     // Update PC
-                    break_condition |= updatePC(jump, Regs.PC, Regs.A, instruction);
+                    if (updatePC(jump, Regs.PC, Regs.A, instruction)) {
+                    	break_reason = BREAK_REASON_STOP;
+                    }
                     cinst_phase = 0;
 #ifdef PIPELINE_II_1
                 }
 #endif
             }
         }
-        if (break_condition) {
+        if (break_reason != BREAK_REASON_CYCLE) {
         	cycle++;
         }
     }
+    return break_reason;
+}
+
+#define SEND_NUM_RETVALS(num) {command_packet_out.write(num);}
+
+static word_t bit_count(word_t bitmap) {
+	word_t count = 0;
+	for (int i = 0; i < bitmap.width; i++) {
+		if (bitmap[i]) count++;
+	}
+	return count;
 }
 
 void cpu_wrapper(hls::stream<word_t>& command_packet_in,
@@ -245,6 +260,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             case NORMAL_OPERATION:
                 cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
                 halt = 0;
+                SEND_NUM_RETVALS(0);
                 break;
             case SET_RESET_CONFIG:
             {
@@ -252,6 +268,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 word_t bitmap = command_packet_in.read();
                 reset = (bitmap & RESET_BIT_RESET)? 1: 0;
                 halt = (bitmap & RESET_BIT_HALT)? 1: 0;
+                SEND_NUM_RETVALS(0);
                 break;
             }
             case GET_RESET_CONFIG:
@@ -259,6 +276,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 word_t bitmap = 0;
                 if (reset) bitmap |= RESET_BIT_RESET;
                 if (halt) bitmap |= RESET_BIT_HALT;
+                SEND_NUM_RETVALS(1);
                 command_packet_out.write(bitmap);
                 break;
             }
@@ -269,6 +287,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             	while(command_packet_in.empty()) {}
                 word_t data = command_packet_in.read();
                 i_ram[address] = data;
+                SEND_NUM_RETVALS(0);
                 break;
             }
             case LOAD_TO_IRAM: 
@@ -282,6 +301,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                     word_t data = command_packet_in.read();
                     i_ram[address+i] = data;
                 }
+                SEND_NUM_RETVALS(0);
                 break;
             }
             case WRITE_TO_DRAM: 
@@ -291,22 +311,26 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             	while(command_packet_in.empty()) {}
                 word_t data = command_packet_in.read();
                 d_ram[address] = data;
+                SEND_NUM_RETVALS(0);
                 break;
             }
             case READ_FROM_DRAM: 
             {
             	while(command_packet_in.empty()) {}
                 addr_t address = (addr_t)command_packet_in.read();
+                SEND_NUM_RETVALS(1);
                 command_packet_out.write(d_ram[address]);
                 break;
             }
             case STEP_EXECUTION:
                 cycle_to_stop = cycle+1;
                 halt = 0;
+                SEND_NUM_RETVALS(0);
                 break;
             case SET_BREAK_CONDITION:
             	while(command_packet_in.empty()) {}
                 break_condition_bitmap = command_packet_in.read();
+                SEND_NUM_RETVALS(0);
                 break;
             case MULTI_STEP_EXECUTION:
             {
@@ -314,12 +338,16 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 word_t steps = command_packet_in.read();
                 cycle_to_stop = cycle+steps;
                 halt = 0;
+                SEND_NUM_RETVALS(0);
                 break;
             }
             case GET_DEBUG_INFO:
             {
             	while(command_packet_in.empty()) {}
                 word_t bitmap = command_packet_in.read();
+                word_t bitcnt = ((bitmap & DINFO_BIT_CYCLE) ? 3:0) + bit_count(bitmap);
+                SEND_NUM_RETVALS(bitcnt);
+
                 if (bitmap & DINFO_BIT_CYCLE) {
                     command_packet_out.write(cycle & 0xFFFF);
                     command_packet_out.write((cycle >> 16) & 0xFFFF);
@@ -342,8 +370,15 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             default:
                 break;
         }
+        word_t break_reason = BREAK_REASON_NOP;
         if (reset || !halt) {
-            cpu(i_ram, d_ram, reset);
+            break_reason = cpu(i_ram, d_ram, reset);
+            halt = 1;
+        }
+        command_packet_out.write(break_reason);
+        if ((break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) && (break_reason == BREAK_REASON_DISP)) {
+        	command_packet_out.write(addressM);
+        	command_packet_out.write(outM);
         }
     }
 }
