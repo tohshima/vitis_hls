@@ -116,6 +116,17 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
 
 static void disp_out_via_uart(uart_comm& uart_comm, word_t addrM, word_t dataM) {
 	if (addrM >= 0x4000) {
+#if 0 // binary version
+		char send_chars[6];
+		unsigned short addr = addrM - 0x4000;
+		send_chars[0] = '!';
+		send_chars[1] = (addrM & 0xFF00) >> 8;
+		send_chars[2] = (addrM & 0x00FF) >> 0;
+		send_chars[3] = (dataM & 0xFF00) >> 8;
+		send_chars[4] = (dataM & 0x00FF) >> 0;
+		send_chars[5] = '\n';
+        uart_comm.write_data(send_chars, sizeof(send_chars));
+#else
 		char send_chars[11];
 		unsigned short addr = addrM - 0x4000;
 		send_chars[0] = '!';
@@ -130,6 +141,7 @@ static void disp_out_via_uart(uart_comm& uart_comm, word_t addrM, word_t dataM) 
 		send_chars[9] = '\n';
 		send_chars[10] = '\0';
         uart_comm.write_data(send_chars, strlen(send_chars));
+#endif
 	}
 }
 

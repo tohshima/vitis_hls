@@ -304,6 +304,14 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                 SEND_NUM_RETVALS(0);
                 break;
             }
+            case READ_FROM_IRAM:
+            {
+            	while(command_packet_in.empty()) {}
+                addr_t address = (addr_t)command_packet_in.read();
+                SEND_NUM_RETVALS(1);
+                command_packet_out.write(i_ram[address]);
+                break;
+            }
             case WRITE_TO_DRAM: 
             {
             	while(command_packet_in.empty()) {}
@@ -368,6 +376,8 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             }
 
             default:
+            	halt = 1;
+            	SEND_NUM_RETVALS(0);
                 break;
         }
         word_t break_reason = BREAK_REASON_NOP;
