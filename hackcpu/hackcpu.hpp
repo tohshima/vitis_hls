@@ -22,11 +22,13 @@ const int TRARCE_SIZE = 32;
 
 // Break reason
 typedef enum {
-	BREAK_REASON_NOP   = 0x8800,
-	BREAK_REASON_RESET = 0x8801,
-	BREAK_REASON_CYCLE = 0x8802,
-	BREAK_REASON_STOP  = 0x8804,
-	BREAK_REASON_DISP  = 0x8808
+	BREAK_REASON_NOP       = 0x8800,
+	BREAK_REASON_RESET     = 0x8801,
+	BREAK_REASON_CYCLE     = 0x8802,
+	BREAK_REASON_STOP      = 0x8804,
+	BREAK_REASON_DISP      = 0x8808,
+	BREAK_REASON_INTERVAL  = 0x8810,
+	BREAK_REASON_KEYIN     = 0x8820
 } break_reason_e;
 
 // Define CPU components
@@ -58,7 +60,9 @@ typedef enum {
 } reset_config_bitmap_e;
 
 typedef enum {
-	BREAK_CONDITION_BIT_DISPOUT = 0x0001,
+	BREAK_CONDITION_BIT_DISPOUT  = 0x0001,
+	BREAK_CONDITION_BIT_INTERVAL = 0x0002,
+	BREAK_CONDITION_BIT_KEYIN    = 0x0004,
 } break_condition_bitmap_e;
 
 typedef enum {

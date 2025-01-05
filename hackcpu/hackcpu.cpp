@@ -104,15 +104,21 @@ static word_t next_inst;
 static ap_uint<1> cinst_phase = 0;
 static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
-static word_t break_condition_bitmap = 0;
+static word_t break_condition_bitmap = BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN;
+static uint64_t break_cycle_interval = 0;
 
-static bool disp_out_check(ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap) {
+static void disp_out_or_key_in_check(ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap,
+		bool mem_access, word_t& break_reason) {
 	if (break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) {
 		if (write_out && (addressM >= 0x4000)) {
-			return true;
+			break_reason = BREAK_REASON_DISP;
 		}
 	}
-	return false;
+	if (mem_access && (break_condition_bitmap & BREAK_CONDITION_BIT_KEYIN)) {
+		if (addressM == 0x6000) {
+			break_reason = BREAK_REASON_KEYIN;
+		}
+	}
 }
 
 // CPU function
@@ -201,9 +207,8 @@ static word_t cpu(word_t i_ram[IRAM_SIZE],
                     addressM = Regs.A;
                     get_destination(instruction, alu_out,
                         Regs.A, Regs.D, d_ram, write_out, outM, addressM);
-                    if (disp_out_check(write_out, addressM, break_condition_bitmap)) {
-                    	break_reason = BREAK_REASON_DISP;
-                    }
+                    disp_out_or_key_in_check(write_out, addressM, break_condition_bitmap,
+                    		instruction[12], break_reason);
 
                     // Jump condition
                     jump = get_jump_condition(alu_out, instruction);
@@ -258,7 +263,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
         control_command_e command = (control_command_e)command_packet_in.read().to_int();
         switch(command) {
             case NORMAL_OPERATION:
-                cycle_to_stop = 0xFFFFFFFFFFFFFFFFull;
+            	cycle_to_stop =  (break_cycle_interval > 0)? cycle+break_cycle_interval:  0xFFFFFFFFFFFFFFFFull;
                 halt = 0;
                 SEND_NUM_RETVALS(0);
                 break;
@@ -333,11 +338,16 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
             case STEP_EXECUTION:
                 cycle_to_stop = cycle+1;
                 halt = 0;
+                break_cycle_interval = 0;
+                break_condition_bitmap &= ~BREAK_CONDITION_BIT_INTERVAL;
                 SEND_NUM_RETVALS(0);
                 break;
             case SET_BREAK_CONDITION:
             	while(command_packet_in.empty()) {}
                 break_condition_bitmap = command_packet_in.read();
+                if (break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) {
+                	break_cycle_interval = command_packet_in.read().to_uint64();
+                }
                 SEND_NUM_RETVALS(0);
                 break;
             case MULTI_STEP_EXECUTION:
@@ -383,6 +393,10 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
         word_t break_reason = BREAK_REASON_NOP;
         if (reset || !halt) {
             break_reason = cpu(i_ram, d_ram, reset);
+            if ((break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) &&
+            		(break_reason == BREAK_REASON_CYCLE)) {
+            	break_reason = BREAK_REASON_INTERVAL;
+            }
             halt = 1;
         }
         command_packet_out.write(break_reason);

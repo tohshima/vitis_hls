@@ -114,6 +114,8 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
     if (bitmap) std::cout << std::endl;
 }
 
+static word_t last_data = 0;
+static word_t last_addr = 0;
 static void disp_out_via_uart(uart_comm& uart_comm, word_t addrM, word_t dataM) {
 	if (addrM >= 0x4000) {
 #if 0 // binary version
@@ -129,18 +131,30 @@ static void disp_out_via_uart(uart_comm& uart_comm, word_t addrM, word_t dataM) 
 #else
 		char send_chars[11];
 		unsigned short addr = addrM - 0x4000;
-		send_chars[0] = '!';
-		for (int i = 1; i <= 4; i++) {
-			char temp = ((addr >> (4 - i) * 4) & 0xF);
-			send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+		if (dataM == last_data) {
+			send_chars[0] = '%';
+			for (int i = 1; i <= 4; i++) {
+				char temp = ((addr >> (4 - i) * 4) & 0xF);
+				send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+			}
+			send_chars[5] = '\n';
+			send_chars[6] = '\0';
+		} else {
+			send_chars[0] = '!';
+			for (int i = 1; i <= 4; i++) {
+				char temp = ((addr >> (4 - i) * 4) & 0xF);
+				send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+			}
+			for (int i = 5; i <= 8; i++) {
+				char temp = ((dataM >> (8 - i) * 4) & 0xF);
+				send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+			}
+			send_chars[9] = '\n';
+			send_chars[10] = '\0';
 		}
-		for (int i = 5; i <= 8; i++) {
-			char temp = ((dataM >> (8 - i) * 4) & 0xF);
-			send_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
-		}
-		send_chars[9] = '\n';
-		send_chars[10] = '\0';
         uart_comm.write_data(send_chars, strlen(send_chars));
+        last_data = dataM;
+        last_addr = addr;
 #endif
 	}
 }
@@ -178,7 +192,26 @@ static void make_hex_chars(word_t hex_data, char hex_chars[6]) {
 	hex_chars[5] = '\0';
 }
 
-static void uart_bridge(uart_comm& uart_comm, hls::stream<word_t>& command_in, hls::stream<word_t>& command_out) {
+static word_t check_key_input(uart_comm& uart_comm) {
+	char read_buf[4] = {0};
+	DWORD bytes_read;
+	if (uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) {
+		if (bytes_read == 4) {
+			if (read_buf[0] == 'K') {
+			    // Key 入力
+				word_t key_code = (read_buf[1]-'0')*100+(read_buf[2]-'0')*10+(read_buf[3]-'0');
+				return key_code;
+			}
+		}
+	}
+	return 0;
+}
+
+static void uart_bridge(uart_comm& uart_comm) {
+    // CPU interface signals
+    hls::stream<word_t> command_in;
+    hls::stream<word_t> command_out;
+
 	char read_buf[4] = {0};
 	DWORD bytes_read;
 	while (1) {
@@ -202,6 +235,15 @@ static void uart_bridge(uart_comm& uart_comm, hls::stream<word_t>& command_in, h
 							word_t data = command_out.read();
 							disp_out_via_uart(uart_comm, addr, data);
 
+							// auto continue
+							command_in.write(NORMAL_OPERATION);
+						} else if (reason == BREAK_REASON_KEYIN) {
+							word_t key_code = check_key_input(uart_comm);
+							command_in.write(WRITE_TO_DRAM);
+							command_in.write(0x6000);
+							command_in.write(key_code);
+							cpu_wrapper(command_in, command_out);
+							DUMMY_READ();
 							// auto continue
 							command_in.write(NORMAL_OPERATION);
 						} else {
@@ -234,11 +276,11 @@ int main() {
 
 	uart_comm uart_comm("\\\\.\\"USE_COM);  // COM2ポートを開く
 
+#if 0
     // CPU interface signals
     hls::stream<word_t> command_in;
     hls::stream<word_t> command_out;
 
- #if 1
     // Reset CPU
     command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_RESET | RESET_BIT_HALT);
@@ -251,7 +293,8 @@ int main() {
 
     // Write to ROM
     // Read ROM content from file
-    read_rom_file("rom_string_test.bin", command_in, command_out);
+    //read_rom_file("rom_string_test.bin", command_in, command_out);
+    read_rom_file("rom_pong.bin", command_in, command_out);
 
     // For rect example
     command_in.write(WRITE_TO_DRAM);
@@ -259,9 +302,10 @@ int main() {
     command_in.write(0x0014);
 
     command_in.write(SET_BREAK_CONDITION);
-    command_in.write(BREAK_CONDITION_BIT_DISPOUT);
+    command_in.write(BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN);
+    //command_in.write(0x8000);
 
-    command_in.write(STEP_EXECUTION);
+//    command_in.write(STEP_EXECUTION);
     cpu_wrapper(command_in, command_out);
     DUMMY_READ();
 #endif
