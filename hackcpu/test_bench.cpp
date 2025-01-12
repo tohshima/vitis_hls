@@ -11,8 +11,6 @@
 
 #define USE_COM "COM2"
 
-#define DUMMY_READ() {while(!command_out.empty()) {command_out.read();}}
-
 void read_rom_file(const std::string& filename,
              hls::stream<word_t>& command_in,
              hls::stream<word_t>& command_out) {
@@ -173,24 +171,7 @@ int compare(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, b
     return 0;
 }
 
-static word_t make_hex_bin(const char* hex_chars) {
-	word_t hex_data = 0;
-	for (int i = 0; i < 4; i++) {
-		if ((hex_chars[i] >= '0') && (hex_chars[i] <= '9')) hex_data += ((hex_chars[i]-'0') << (3-i)*4);
-		else if ((hex_chars[i] >= 'a') && (hex_chars[i] <= 'f')) hex_data += ((hex_chars[i]-'a'+10) << (3-i)*4);
-		else if ((hex_chars[i] >= 'A') && (hex_chars[i] <= 'F')) hex_data += ((hex_chars[i]-'A'+10) << (3-i)*4);
-	}
-	return hex_data;
-}
-
-static void make_hex_chars(word_t hex_data, char hex_chars[6]) {
-	for (int i = 0; i < 4; i++) {
-		char temp = ((hex_data >> (3 - i) * 4) & 0xF);
-		hex_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
-	}
-	hex_chars[4] = '\n';
-	hex_chars[5] = '\0';
-}
+#if 0
 
 static word_t check_key_input(uart_comm& uart_comm) {
 	char read_buf[4] = {0};
@@ -207,11 +188,8 @@ static word_t check_key_input(uart_comm& uart_comm) {
 	return 0;
 }
 
-static void uart_bridge(uart_comm& uart_comm) {
-    // CPU interface signals
-    hls::stream<word_t> command_in;
-    hls::stream<word_t> command_out;
 
+static void uart_bridge(uart_comm& uart_comm) {
 	char read_buf[4] = {0};
 	DWORD bytes_read;
 	while (1) {
@@ -271,11 +249,59 @@ static void uart_bridge(uart_comm& uart_comm) {
 		}
 	}
 }
+#endif
 
 int main() {
 
 	uart_comm uart_comm("\\\\.\\"USE_COM);  // COM2ポートを開く
 
+#if 1
+    char read_buf[TOKEN_SIZE];
+    DWORD bytes_read = 0;
+	bool start = true;
+	ap_uint<1> interrupt = 0;
+    volatile unsigned int uart_reg[4] = {0};
+    volatile char num_disp_out_ = 0;
+    volatile char num_char_out_ = 0;
+    char char_out_[108];
+    volatile char commandin_available_ = false;
+    char commandin_[4];
+    volatile char keyin_available_ = false;
+    char keyin_[4];
+	volatile char debug_phase_ = 0;
+	volatile char debug_rx_data_ = 0;
+	volatile char debug_injection = 0;
+
+	uart_if(start, interrupt, uart_reg, num_disp_out_, num_char_out_, char_out_,
+			commandin_available_, commandin_, keyin_available_, keyin_,
+			debug_phase_, debug_rx_data_, debug_injection); // initialization
+    while (1) {
+    	num_disp_out_ = 0;
+    	num_char_out_ = 0;
+    	commandin_available_ = false;
+    	keyin_available_ = false;
+    	if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) && (bytes_read == sizeof(read_buf))) {
+    		if (read_buf[0] == 'K') {
+    			keyin_available_ = true;
+    			memcpy(keyin_, read_buf, sizeof(keyin_));
+    		} else {
+    			commandin_available_ = true;
+    			memcpy(commandin_, read_buf, sizeof(commandin_));
+    		}
+		}
+		uart_if(start, interrupt, uart_reg, num_disp_out_, num_char_out_, char_out_,
+				commandin_available_, commandin_, keyin_available_, keyin_,
+				debug_phase_, debug_rx_data_, debug_injection);
+		if (num_disp_out_) {
+			uart_comm.write_data(char_out_, num_disp_out_);
+			commandin_[0] = 'N';
+		} else if (num_char_out_) {
+			uart_comm.write_data(char_out_, num_char_out_);
+		}
+    }
+#else
+    uart_bridge(uart_comm, command_in, command_out);
+#endif
 #if 0
     // CPU interface signals
     hls::stream<word_t> command_in;
@@ -308,12 +334,6 @@ int main() {
 //    command_in.write(STEP_EXECUTION);
     cpu_wrapper(command_in, command_out);
     DUMMY_READ();
-#endif
-
-#if 1
-    uart_bridge(uart_comm, command_in, command_out);
-
-#else
 
     // Run CPU cycle
     #if 0

@@ -97,4 +97,31 @@ typedef struct {
 void cpu_wrapper(hls::stream<word_t>& command_packet_in,
                  hls::stream<word_t>& command_packet_out);
 
+void uart_bridge(const char char_in[4], bool& auto_continue_requested,
+		char char_out[108], word_t& num_char_out, word_t& num_disp_out, bool& key_requested);
 
+#define DUMMY_READ() {while(!command_out.empty()) {command_out.read();}}
+
+// UART Lite レジスタのオフセット
+#define RX_FIFO_OFFSET  0x0
+#define TX_FIFO_OFFSET  0x1
+#define STAT_REG_OFFSET  0x2
+#define CTRL_REG_OFFSET  0x3
+
+#define TOKEN_SIZE (4)
+
+void uart_if(
+	bool start,
+	const ap_uint<1>& interrupt,
+	volatile unsigned int *uart_reg,
+	volatile char& num_disp_out_,
+	volatile char& num_char_out_,
+	char* char_out_,
+	volatile char commandin_available_,
+	char* commandin_,
+	volatile char keyin_available_,
+	char* keyin_,
+	volatile char& debug_phase_,
+	volatile char& debug_rx_data_,
+	char debug_injection
+);

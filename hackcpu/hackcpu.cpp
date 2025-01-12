@@ -406,3 +406,298 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
         }
     }
 }
+
+static word_t make_hex_bin(const char* hex_chars) {
+	word_t hex_data = 0;
+	for (int i = 0; i < 4; i++) {
+		if ((hex_chars[i] >= '0') && (hex_chars[i] <= '9')) hex_data += ((hex_chars[i]-'0') << (3-i)*4);
+		else if ((hex_chars[i] >= 'a') && (hex_chars[i] <= 'f')) hex_data += ((hex_chars[i]-'a'+10) << (3-i)*4);
+		else if ((hex_chars[i] >= 'A') && (hex_chars[i] <= 'F')) hex_data += ((hex_chars[i]-'A'+10) << (3-i)*4);
+	}
+	return hex_data;
+}
+
+static word_t make_hex_chars(word_t hex_data, char* hex_chars) {
+	for (int i = 0; i < 4; i++) {
+		char temp = ((hex_data >> (3 - i) * 4) & 0xF);
+		hex_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
+	}
+	hex_chars[4] = '\n';
+	//hex_chars[5] = '\0';
+	return 5;
+}
+
+static word_t make_disp_out(word_t addrM, word_t dataM, char* out) {
+	static word_t last_data_ = 0;
+	if (addrM >= 0x4000) {
+		unsigned short addr = addrM - 0x4000;
+		if (dataM == last_data_) {
+			out[0] = '%';
+			for (int i = 1; i <= 4; i++) {
+				char temp = ((addr >> (4 - i) * 4) & 0xF);
+				out[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+			}
+			out[5] = '\n';
+			//out[6] = '\0';
+			return 6;
+		} else {
+			out[0] = '!';
+			for (int i = 1; i <= 4; i++) {
+				char temp = ((addr >> (4 - i) * 4) & 0xF);
+				out[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+			}
+			for (int i = 5; i <= 8; i++) {
+				char temp = ((dataM >> (8 - i) * 4) & 0xF);
+				out[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+			}
+			out[9] = '\n';
+			//out[10] = '\0';
+			last_data_ = dataM;
+			return 10;
+		}
+	}
+	return 0;
+}
+
+static void cpu_wrapper2(word_t command, bool command_execute,
+		word_t read_data[16], word_t& num_ret, word_t& ret_status,
+		word_t disp_out[2], bool auto_continue, bool key_input, word_t key_code) {
+    // CPU interface signals
+    static hls::stream<word_t> command_in;
+    static hls::stream<word_t> command_out;
+
+    num_ret = 0;
+	if (key_input) {
+		command_in.write(WRITE_TO_DRAM);
+		command_in.write(0x6000);
+		command_in.write(key_code);
+		cpu_wrapper(command_in, command_out);
+		DUMMY_READ();
+	}
+	if (command_execute) {
+		if (auto_continue) {
+			// auto continue
+			command_in.write(NORMAL_OPERATION);
+		}
+		// 実行
+		cpu_wrapper(command_in, command_out);
+		while (command_out.empty()) {}
+		num_ret = command_out.read();
+		for (int i = 0; i < num_ret; i++) {
+			read_data[i] = command_out.read();
+		}
+		ret_status = command_out.read();
+		if (ret_status == BREAK_REASON_DISP) {
+			disp_out[0] = command_out.read();
+			disp_out[1] = command_out.read();
+		}
+	} else {
+		//sprintf(buf, "snd: %04x", send_data);
+		//std::cout << buf << std::endl;
+		command_in.write(command);
+	}
+}
+
+void uart_bridge(const char char_in[4], bool& auto_continue_requested,
+		char char_out[108], word_t& num_char_out, word_t& num_disp_out, bool& key_requested) {
+	bool command_execute = false;
+	word_t read_data[16];
+	word_t num_ret = 0;
+	word_t ret_status = 0;
+	static word_t disp_out[2];
+	bool auto_continue = false;
+	bool key_input = false;
+	word_t key_code = 0;
+
+	num_char_out = 0;
+	num_disp_out = 0;
+	auto_continue_requested = false;
+	key_requested = false;
+
+	if (char_in[0] == 'K') {
+		key_input = true;
+		command_execute = true;
+		auto_continue = true;
+		key_code = (char_in[1]-'0')*100+(char_in[2]-'0')*10+(char_in[3]-'0');
+	}
+	else if (char_in[0] == 'N') {
+		command_execute = true;
+		auto_continue = true;
+	} else if (char_in[0] == 'Z') {
+		command_execute = true;
+	}
+	word_t command = make_hex_bin(char_in);
+	cpu_wrapper2(command, command_execute, read_data, num_ret, ret_status,
+			disp_out, auto_continue, key_input, key_code);
+	if (ret_status == BREAK_REASON_DISP) {
+		num_disp_out = make_disp_out(disp_out[0], disp_out[1], &char_out[0]);
+		auto_continue_requested = true;
+	} else if (ret_status == BREAK_REASON_KEYIN) {
+		key_requested = true;
+	} else if (command_execute) {
+		num_char_out += make_hex_chars(num_ret, &char_out[0]);
+		for (int i = 0; i < num_ret; i++) {
+			num_char_out += make_hex_chars(read_data[i], &char_out[(i+1)*5]);
+		}
+		num_char_out += make_hex_chars(ret_status, &char_out[(num_ret+1)*5]);
+	}
+}
+
+static bool initialized = false;
+static int phase = -1;
+
+static void send_char(volatile unsigned int *uart_reg, const char c) {
+	// TXFIFOが満杯でないか確認
+	while ((uart_reg[STAT_REG_OFFSET] & 0x00000008)) {};
+	// データをTXFIFOに書き込む
+	uart_reg[TX_FIFO_OFFSET] = c;
+}
+
+static bool send_str(volatile unsigned int *uart_reg, const char *s, int& p, int length) {
+	if ((s[p] != 0) && (p < length)) {
+		send_char(uart_reg, s[p]);
+		p++;
+	}
+	if (p == length) {
+		p = 0;
+		return true;
+	}
+	return false;
+}
+
+static bool get_token(const ap_uint<1>& interrupt,
+	    volatile unsigned int *uart_reg,
+		volatile char& debug_rx_data_,
+		char* rx_buf, int& rx_bufp
+) {
+	while (uart_reg[STAT_REG_OFFSET] & 0x00000001) {
+		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+		rx_buf[rx_bufp++] = debug_rx_data_;
+		if (rx_bufp == TOKEN_SIZE) {
+			rx_bufp = 0;
+			return true;
+		}
+	}
+	return false;
+}
+
+static void uart_execute(
+		const ap_uint<1>& interrupt,
+		volatile unsigned int *uart_reg,
+		volatile char& num_disp_out_,
+		volatile char& num_char_out_,
+		char* char_out_,
+		char commandin_available_,
+		char* commandin_,
+		char keyin_available_,
+		char* keyin_,
+		volatile char& debug_phase_,
+		volatile char& debug_rx_data_) {
+    static bool auto_cont_requested = false;
+    static bool key_requested = false;
+    static char char_out[108];
+    static word_t num_char_out = 0;
+    static word_t num_disp_out = 0;
+    static const char no_keyin[TOKEN_SIZE] = {'K','0','0','0'};
+    static const char auto_continue[TOKEN_SIZE] = {'N','0','0','0'};
+
+    static char rx_buf[TOKEN_SIZE] = {0};
+    static int rx_bufp = 0;
+    static int out_p = 0;
+    static int key_in_count = 0;
+    num_disp_out_ = 0;
+    num_char_out_ = 0;
+
+	if (num_disp_out) {
+		// display out
+		debug_phase_ = phase = 0xE3;
+		while (send_str(uart_reg, char_out, out_p, num_disp_out)) {}
+		num_disp_out_ = num_disp_out;
+		num_disp_out = 0; // 1文字ずつ出して出し切った
+		memcpy(char_out_, char_out, num_disp_out_);
+	} else if (num_char_out) {
+		// command completed
+		debug_phase_ = phase = 0xE2;
+		while (send_str(uart_reg, char_out, out_p, num_char_out)) {}
+		num_char_out_ = num_char_out;
+		num_char_out = 0; // 1文字ずつ出して出し切った
+		memcpy(char_out_, char_out, num_char_out_);
+	} else if (key_requested) {
+	    // Key 入力
+		debug_phase_ = phase = 0xE1;
+		const char* key_in = no_keyin;
+		if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
+			key_in = rx_buf;
+		} else if (keyin_available_) {
+			key_in = keyin_;
+		}
+		uart_bridge(key_in, auto_cont_requested, char_out, num_char_out, num_disp_out, key_requested);
+	} else if (auto_cont_requested) {
+		debug_phase_ = phase = 0xEA;
+		uart_bridge(auto_continue, auto_cont_requested, char_out, num_char_out, num_disp_out, key_requested);
+	} else {
+		char* command_in = NULL;
+		if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
+			command_in = rx_buf;
+		} else if (commandin_available_) {
+			command_in = commandin_;
+		}
+		if (command_in) {
+		    // RXFIFOからデータを読み取る
+			debug_phase_ = phase = 0xE0;
+			uart_bridge(command_in, auto_cont_requested, char_out, num_char_out, num_disp_out, key_requested);
+		}
+	}
+}
+
+void uart_if(
+	bool start,
+	const ap_uint<1>& interrupt,
+	volatile unsigned int *uart_reg,
+	volatile char& num_disp_out_,
+	volatile char& num_char_out_,
+	char* char_out_,
+	volatile char commandin_available_,
+	char* commandin_,
+	volatile char keyin_available_,
+	char* keyin_,
+	volatile char& debug_phase_,
+	volatile char& debug_rx_data_,
+	char debug_injection
+) {
+	#pragma HLS INTERFACE ap_none port=start
+    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct bundle=AXIM depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+	#pragma HLS INTERFACE ap_none port=debug_phase_
+	#pragma HLS INTERFACE ap_none port=debug_rx_data_
+    #pragma HLS INTERFACE ap_none port=return
+
+	// ボーレート設定（例：115200 bps）
+	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します
+
+    debug_phase_ = phase = 0;
+	debug_rx_data_ = 0;
+	if (start && !initialized) {
+		debug_phase_ = phase = 2;
+		initialized = true;
+		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ソフトウェアリセット
+		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
+		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
+
+	} else if (start && debug_injection) {
+
+		// データをTXFIFOに書き込む
+		send_char(uart_reg, debug_injection);
+		debug_phase_ = phase = 10;
+		// RXFIFOからデータを読み取る
+		while((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 0) {}
+		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+
+	} else if (start) {
+		debug_phase_ = phase = 6;
+		uart_execute(interrupt, uart_reg,
+				num_disp_out_, num_char_out_, char_out_,
+				commandin_available_, commandin_,
+				keyin_available_, keyin_,
+				debug_phase_, debug_rx_data_);
+    }
+}
