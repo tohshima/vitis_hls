@@ -461,10 +461,13 @@ static word_t make_disp_out(word_t addrM, word_t dataM, char* out) {
 	return 0;
 }
 
-static void cpu_wrapper2(word_t command, bool command_execute,
+void cpu_wrapper2(word_t command, bool command_execute,
 		word_t read_data[16], word_t& num_ret, word_t& ret_status,
 		word_t disp_out[2], bool auto_continue, bool key_input, word_t key_code) {
-    // CPU interface signals
+#pragma HLS INTERFACE ap_memory port=read_data storage_type=ram_t2p
+#pragma HLS INTERFACE ap_memory port=disp_out storage_type=ram_t2p
+
+	// CPU interface signals
     static hls::stream<word_t> command_in;
     static hls::stream<word_t> command_out;
 
@@ -500,13 +503,20 @@ static void cpu_wrapper2(word_t command, bool command_execute,
 	}
 }
 
-void uart_bridge(const char char_in[4], volatile char& auto_continue_requested,
-		char char_out[108], word_t& num_char_out, word_t& num_disp_out, bool& key_requested) {
+void uart_bridge(const char char_in[TOKEN_SIZE], volatile char& auto_continue_requested,
+		char char_out[OUT_CHAR_SIZE], word_t& num_char_out, word_t& num_disp_out, volatile char& key_requested) {
+	#pragma HLS INTERFACE ap_memory port=char_in storage_type=ram_2p
+	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
+
 	bool command_execute = false;
 	word_t read_data[16];
+	#pragma HLS BIND_STORAGE variable=read_data type=RAM_T2P impl=BRAM
+
 	word_t num_ret = 0;
 	word_t ret_status = 0;
 	static word_t disp_out[2];
+	#pragma HLS BIND_STORAGE variable=disp_out type=RAM_T2P impl=BRAM
+
 	bool auto_continue = false;
 	bool key_input = false;
 	word_t key_code = 0;
@@ -549,13 +559,18 @@ static bool initialized = false;
 static int phase = -1;
 
 static void send_char(volatile unsigned int *uart_reg, const char c) {
+	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+
 	// TXFIFOが満杯でないか確認
 	while ((uart_reg[STAT_REG_OFFSET] & 0x00000008)) {};
 	// データをTXFIFOに書き込む
 	uart_reg[TX_FIFO_OFFSET] = c;
 }
 
-static bool send_str(volatile unsigned int *uart_reg, const char *s, int& p, int length) {
+static bool send_str(volatile unsigned int *uart_reg, const char s[TOKEN_SIZE], int& p, int length) {
+	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE ap_memory port=s storage_type=ram_t2p
+
 	if ((s[p] != 0) && (p < length)) {
 		send_char(uart_reg, s[p]);
 		p++;
@@ -570,8 +585,11 @@ static bool send_str(volatile unsigned int *uart_reg, const char *s, int& p, int
 static bool get_token(const ap_uint<1>& interrupt,
 	    volatile unsigned int *uart_reg,
 		volatile char& debug_rx_data_,
-		char* rx_buf, int& rx_bufp
+		char rx_buf[TOKEN_SIZE], int& rx_bufp
 ) {
+	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE ap_memory port=rx_buf storage_type=ram_t2p
+
 	while (uart_reg[STAT_REG_OFFSET] & 0x00000001) {
 		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
 		rx_buf[rx_bufp++] = debug_rx_data_;
@@ -588,12 +606,16 @@ static void process_output(
 		word_t& num_disp_out,
 		word_t& num_char_out,
 		int out_p,
-		char* char_out,
+		char char_out[OUT_CHAR_SIZE],
 		volatile char& num_disp_out_,
 		volatile char& num_char_out_,
-		char* char_out_,
+		char char_out_[OUT_CHAR_SIZE],
 		volatile char& debug_phase_,
 		volatile char& debug_rx_data_) {
+	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
+
 	if (num_disp_out) {
 		// display out
 		debug_phase_ = phase = 0xE3;
@@ -611,28 +633,63 @@ static void process_output(
 	}
 }
 
+static void execute_command(
+		const char command_in[4],
+		volatile char& auto_continue_requested_,
+		volatile char& key_requested,
+		volatile unsigned int *uart_reg,
+		word_t& num_disp_out,
+		word_t& num_char_out,
+		int out_p,
+		char char_out[OUT_CHAR_SIZE],
+		volatile char& num_disp_out_,
+		volatile char& num_char_out_,
+		char char_out_[OUT_CHAR_SIZE],
+		volatile char& debug_phase_,
+		volatile char& debug_rx_data_) {
+	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
+
+	// コマンド実行
+	debug_phase_ = 0xE0;
+	uart_bridge(command_in, auto_continue_requested_,
+			char_out, num_char_out, num_disp_out, key_requested);
+	process_output(uart_reg,
+			num_disp_out, num_char_out, out_p, char_out,
+			num_disp_out_, num_char_out_, char_out_,
+			debug_phase_, debug_rx_data_);
+}
+
 static void uart_execute(
 		const ap_uint<1>& interrupt,
 		volatile unsigned int *uart_reg,
 		volatile char& auto_continue_requested_,
 		volatile char& num_disp_out_,
 		volatile char& num_char_out_,
-		char* char_out_,
+		char char_out_[OUT_CHAR_SIZE],
 		char commandin_available_,
-		char* commandin_,
+		const char commandin_[TOKEN_SIZE],
 		char keyin_available_,
-		char* keyin_,
+		const char keyin_[TOKEN_SIZE],
 		volatile char& debug_phase_,
 		volatile char& debug_rx_data_) {
-#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=commandin_ storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=keyin_ storage_type=ram_t2p
 
-	static bool key_requested = false;
-    static char char_out[108];
+	static char key_requested = false;
+    static char char_out[OUT_CHAR_SIZE];
+	#pragma HLS BIND_STORAGE variable=char_out type=RAM_T2P impl=BRAM
+
     static word_t num_char_out = 0;
     static word_t num_disp_out = 0;
     static const char no_keyin[TOKEN_SIZE] = {'K','0','0','0'};
 
     static char rx_buf[TOKEN_SIZE] = {0};
+	#pragma HLS BIND_STORAGE variable=rx_buf type=RAM_T2P impl=BRAM
+
     static int rx_bufp = 0;
     static int out_p = 0;
     static int key_in_count = 0;
@@ -642,31 +699,28 @@ static void uart_execute(
 	if (key_requested) {
 	    // Key 入力
 		debug_phase_ = phase = 0xE1;
-		const char* key_in = no_keyin;
-		if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
-			key_in = rx_buf;
-		} else if (keyin_available_) {
-			key_in = keyin_;
+		if (keyin_available_) {
+			uart_bridge(keyin_, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
+		} else if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
+			uart_bridge(rx_buf, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
+		} else {
+			uart_bridge(no_keyin, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
 		}
-		uart_bridge(key_in, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
 		process_output(uart_reg,
 				num_disp_out, num_char_out, out_p, char_out,
 				num_disp_out_, num_char_out_, char_out_,
 				debug_phase_, debug_rx_data_);
 	} else {
-		char* command_in = NULL;
 		if (commandin_available_) {
-			command_in = commandin_;
+			execute_command(commandin_, auto_continue_requested_, key_requested,
+					uart_reg, num_disp_out, num_char_out, out_p,
+					char_out, num_disp_out_, num_char_out_, char_out_,
+					debug_phase_, debug_rx_data_);
+
 		} else if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
-			command_in = rx_buf;
-		}
-		if (command_in) {
-		    // コマンド実行
-			debug_phase_ = phase = 0xE0;
-			uart_bridge(command_in, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
-			process_output(uart_reg,
-					num_disp_out, num_char_out, out_p, char_out,
-					num_disp_out_, num_char_out_, char_out_,
+			execute_command(rx_buf, auto_continue_requested_, key_requested,
+					uart_reg, num_disp_out, num_char_out, out_p,
+					char_out, num_disp_out_, num_char_out_, char_out_,
 					debug_phase_, debug_rx_data_);
 		}
 	}
@@ -679,11 +733,11 @@ void uart_if(
 	volatile char& auto_continue_requested_,
 	volatile char& num_disp_out_,
 	volatile char& num_char_out_,
-	char* char_out_,
+	char char_out_[OUT_CHAR_SIZE],
 	volatile char commandin_available_,
-	char* commandin_,
+	const char commandin_[TOKEN_SIZE],
 	volatile char keyin_available_,
-	char* keyin_,
+	const char keyin_[TOKEN_SIZE],
 	volatile char& debug_phase_,
 	volatile char& debug_rx_data_,
 	char debug_injection
@@ -693,6 +747,9 @@ void uart_if(
 	#pragma HLS INTERFACE ap_none port=debug_phase_
 	#pragma HLS INTERFACE ap_none port=debug_rx_data_
     #pragma HLS INTERFACE ap_none port=return
+	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=commandin_ storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=keyin_ storage_type=ram_t2p
 
 	// ボーレート設定（例：115200 bps）
 	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します

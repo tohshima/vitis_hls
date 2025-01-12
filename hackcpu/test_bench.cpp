@@ -264,7 +264,7 @@ int main() {
     volatile char auto_continue_requested_ = false;
     volatile char num_disp_out_ = 0;
     volatile char num_char_out_ = 0;
-    char char_out_[108];
+    char char_out_[OUT_CHAR_SIZE];
     volatile char commandin_available_ = false;
     char commandin_[4];
     volatile char keyin_available_ = false;

@@ -109,6 +109,7 @@ void uart_bridge(const char char_in[4], bool& auto_continue_requested,
 #define CTRL_REG_OFFSET  0x3
 
 #define TOKEN_SIZE (4)
+#define OUT_CHAR_SIZE (108)
 
 void uart_if(
 	bool start,
@@ -117,11 +118,11 @@ void uart_if(
 	volatile char& auto_continue_requested_,
 	volatile char& num_disp_out_,
 	volatile char& num_char_out_,
-	char* char_out_,
+	char char_out_[OUT_CHAR_SIZE],
 	volatile char commandin_available_,
-	char* commandin_,
+	const char commandin_[TOKEN_SIZE],
 	volatile char keyin_available_,
-	char* keyin_,
+	const char keyin_[TOKEN_SIZE],
 	volatile char& debug_phase_,
 	volatile char& debug_rx_data_,
 	char debug_injection
