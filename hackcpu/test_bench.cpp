@@ -261,6 +261,7 @@ int main() {
 	bool start = true;
 	ap_uint<1> interrupt = 0;
     volatile unsigned int uart_reg[4] = {0};
+    volatile char auto_continue_requested_ = false;
     volatile char num_disp_out_ = 0;
     volatile char num_char_out_ = 0;
     char char_out_[108];
@@ -271,16 +272,20 @@ int main() {
 	volatile char debug_phase_ = 0;
 	volatile char debug_rx_data_ = 0;
 	volatile char debug_injection = 0;
+    static const char auto_continue[TOKEN_SIZE] = {'N','0','0','0'};
 
-	uart_if(start, interrupt, uart_reg, num_disp_out_, num_char_out_, char_out_,
+	uart_if(start, interrupt, uart_reg, auto_continue_requested_,
+			num_disp_out_, num_char_out_, char_out_,
 			commandin_available_, commandin_, keyin_available_, keyin_,
 			debug_phase_, debug_rx_data_, debug_injection); // initialization
     while (1) {
-    	num_disp_out_ = 0;
-    	num_char_out_ = 0;
+    	// “ü—Í
     	commandin_available_ = false;
     	keyin_available_ = false;
-    	if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) && (bytes_read == sizeof(read_buf))) {
+    	if (auto_continue_requested_) {
+			commandin_available_ = true;
+    		memcpy(commandin_, auto_continue, TOKEN_SIZE);
+    	} else if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) && (bytes_read == sizeof(read_buf))) {
     		if (read_buf[0] == 'K') {
     			keyin_available_ = true;
     			memcpy(keyin_, read_buf, sizeof(keyin_));
@@ -289,12 +294,17 @@ int main() {
     			memcpy(commandin_, read_buf, sizeof(commandin_));
     		}
 		}
-		uart_if(start, interrupt, uart_reg, num_disp_out_, num_char_out_, char_out_,
+    	// Às
+    	num_disp_out_ = 0;
+    	num_char_out_ = 0;
+    	auto_continue_requested_ = false;
+		uart_if(start, interrupt, uart_reg, auto_continue_requested_,
+				num_disp_out_, num_char_out_, char_out_,
 				commandin_available_, commandin_, keyin_available_, keyin_,
 				debug_phase_, debug_rx_data_, debug_injection);
+		// o—Í
 		if (num_disp_out_) {
 			uart_comm.write_data(char_out_, num_disp_out_);
-			commandin_[0] = 'N';
 		} else if (num_char_out_) {
 			uart_comm.write_data(char_out_, num_char_out_);
 		}

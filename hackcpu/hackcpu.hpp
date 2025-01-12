@@ -114,6 +114,7 @@ void uart_if(
 	bool start,
 	const ap_uint<1>& interrupt,
 	volatile unsigned int *uart_reg,
+	volatile char& auto_continue_requested_,
 	volatile char& num_disp_out_,
 	volatile char& num_char_out_,
 	char* char_out_,

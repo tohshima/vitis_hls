@@ -1,3 +1,4 @@
+#include <string.h>
 #include "hackcpu.hpp"
 
 static void comp_core(word_t instruction, word_t x, word_t y, word_t &alu_out) {
@@ -130,7 +131,6 @@ static word_t cpu(word_t i_ram[IRAM_SIZE],
 #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
 #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
 #pragma HLS INTERFACE ap_none port=reset
-#pragma HLS INTERFACE m_axi port=uart_regs depth=32
 
 	word_t break_reason = BREAK_REASON_CYCLE;
     if (reset) {
@@ -246,7 +246,6 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
     //#pragma HLS INTERFACE ap_fifo port=debug 
-    #pragma HLS INTERFACE m_axi port=uart_regs depth=32
 
     // Internal ROM
     static word_t i_ram[IRAM_SIZE];
@@ -431,6 +430,7 @@ static word_t make_disp_out(word_t addrM, word_t dataM, char* out) {
 	static word_t last_data_ = 0;
 	if (addrM >= 0x4000) {
 		unsigned short addr = addrM - 0x4000;
+#if 1
 		if (dataM == last_data_) {
 			out[0] = '%';
 			for (int i = 1; i <= 4; i++) {
@@ -440,7 +440,9 @@ static word_t make_disp_out(word_t addrM, word_t dataM, char* out) {
 			out[5] = '\n';
 			//out[6] = '\0';
 			return 6;
-		} else {
+		} else
+#endif
+		{
 			out[0] = '!';
 			for (int i = 1; i <= 4; i++) {
 				char temp = ((addr >> (4 - i) * 4) & 0xF);
@@ -498,7 +500,7 @@ static void cpu_wrapper2(word_t command, bool command_execute,
 	}
 }
 
-void uart_bridge(const char char_in[4], bool& auto_continue_requested,
+void uart_bridge(const char char_in[4], volatile char& auto_continue_requested,
 		char char_out[108], word_t& num_char_out, word_t& num_disp_out, bool& key_requested) {
 	bool command_execute = false;
 	word_t read_data[16];
@@ -581,33 +583,17 @@ static bool get_token(const ap_uint<1>& interrupt,
 	return false;
 }
 
-static void uart_execute(
-		const ap_uint<1>& interrupt,
+static void process_output(
 		volatile unsigned int *uart_reg,
+		word_t& num_disp_out,
+		word_t& num_char_out,
+		int out_p,
+		char* char_out,
 		volatile char& num_disp_out_,
 		volatile char& num_char_out_,
 		char* char_out_,
-		char commandin_available_,
-		char* commandin_,
-		char keyin_available_,
-		char* keyin_,
 		volatile char& debug_phase_,
 		volatile char& debug_rx_data_) {
-    static bool auto_cont_requested = false;
-    static bool key_requested = false;
-    static char char_out[108];
-    static word_t num_char_out = 0;
-    static word_t num_disp_out = 0;
-    static const char no_keyin[TOKEN_SIZE] = {'K','0','0','0'};
-    static const char auto_continue[TOKEN_SIZE] = {'N','0','0','0'};
-
-    static char rx_buf[TOKEN_SIZE] = {0};
-    static int rx_bufp = 0;
-    static int out_p = 0;
-    static int key_in_count = 0;
-    num_disp_out_ = 0;
-    num_char_out_ = 0;
-
 	if (num_disp_out) {
 		// display out
 		debug_phase_ = phase = 0xE3;
@@ -622,7 +608,38 @@ static void uart_execute(
 		num_char_out_ = num_char_out;
 		num_char_out = 0; // 1文字ずつ出して出し切った
 		memcpy(char_out_, char_out, num_char_out_);
-	} else if (key_requested) {
+	}
+}
+
+static void uart_execute(
+		const ap_uint<1>& interrupt,
+		volatile unsigned int *uart_reg,
+		volatile char& auto_continue_requested_,
+		volatile char& num_disp_out_,
+		volatile char& num_char_out_,
+		char* char_out_,
+		char commandin_available_,
+		char* commandin_,
+		char keyin_available_,
+		char* keyin_,
+		volatile char& debug_phase_,
+		volatile char& debug_rx_data_) {
+#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+
+	static bool key_requested = false;
+    static char char_out[108];
+    static word_t num_char_out = 0;
+    static word_t num_disp_out = 0;
+    static const char no_keyin[TOKEN_SIZE] = {'K','0','0','0'};
+
+    static char rx_buf[TOKEN_SIZE] = {0};
+    static int rx_bufp = 0;
+    static int out_p = 0;
+    static int key_in_count = 0;
+    num_disp_out_ = 0;
+    num_char_out_ = 0;
+
+	if (key_requested) {
 	    // Key 入力
 		debug_phase_ = phase = 0xE1;
 		const char* key_in = no_keyin;
@@ -631,21 +648,26 @@ static void uart_execute(
 		} else if (keyin_available_) {
 			key_in = keyin_;
 		}
-		uart_bridge(key_in, auto_cont_requested, char_out, num_char_out, num_disp_out, key_requested);
-	} else if (auto_cont_requested) {
-		debug_phase_ = phase = 0xEA;
-		uart_bridge(auto_continue, auto_cont_requested, char_out, num_char_out, num_disp_out, key_requested);
+		uart_bridge(key_in, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
+		process_output(uart_reg,
+				num_disp_out, num_char_out, out_p, char_out,
+				num_disp_out_, num_char_out_, char_out_,
+				debug_phase_, debug_rx_data_);
 	} else {
 		char* command_in = NULL;
-		if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
-			command_in = rx_buf;
-		} else if (commandin_available_) {
+		if (commandin_available_) {
 			command_in = commandin_;
+		} else if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
+			command_in = rx_buf;
 		}
 		if (command_in) {
-		    // RXFIFOからデータを読み取る
+		    // コマンド実行
 			debug_phase_ = phase = 0xE0;
-			uart_bridge(command_in, auto_cont_requested, char_out, num_char_out, num_disp_out, key_requested);
+			uart_bridge(command_in, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
+			process_output(uart_reg,
+					num_disp_out, num_char_out, out_p, char_out,
+					num_disp_out_, num_char_out_, char_out_,
+					debug_phase_, debug_rx_data_);
 		}
 	}
 }
@@ -654,6 +676,7 @@ void uart_if(
 	bool start,
 	const ap_uint<1>& interrupt,
 	volatile unsigned int *uart_reg,
+	volatile char& auto_continue_requested_,
 	volatile char& num_disp_out_,
 	volatile char& num_char_out_,
 	char* char_out_,
@@ -694,7 +717,7 @@ void uart_if(
 
 	} else if (start) {
 		debug_phase_ = phase = 6;
-		uart_execute(interrupt, uart_reg,
+		uart_execute(interrupt, uart_reg, auto_continue_requested_,
 				num_disp_out_, num_char_out_, char_out_,
 				commandin_available_, commandin_,
 				keyin_available_, keyin_,
