@@ -406,17 +406,24 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
     }
 }
 
-static word_t make_hex_bin(const char* hex_chars) {
+static char convert2hex(char c) {
+	char h = 0;
+	if ((c >= '0') && (c <= '9')) { h = (c-'0'); }
+	else if ((c >= 'a') && (c <= 'f')) { h = (c-'a'+10); }
+	else if ((c >= 'A') && (c <= 'F')) { h = (c-'A'+10); }
+	return h;
+}
+word_t make_hex_bin(uint32_t hex_chars4) {
 	word_t hex_data = 0;
 	for (int i = 0; i < 4; i++) {
-		if ((hex_chars[i] >= '0') && (hex_chars[i] <= '9')) hex_data += ((hex_chars[i]-'0') << (3-i)*4);
-		else if ((hex_chars[i] >= 'a') && (hex_chars[i] <= 'f')) hex_data += ((hex_chars[i]-'a'+10) << (3-i)*4);
-		else if ((hex_chars[i] >= 'A') && (hex_chars[i] <= 'F')) hex_data += ((hex_chars[i]-'A'+10) << (3-i)*4);
+		char c = (hex_chars4 >> i*8) & 0xFF;
+		hex_data += convert2hex(c) << (3-i)*4;
 	}
 	return hex_data;
 }
 
-static word_t make_hex_chars(word_t hex_data, char* hex_chars) {
+static word_t make_hex_chars(word_t hex_data, char hex_chars[5]) {
+	#pragma HLS INTERFACE ap_memory port=hex_chars storage_type=ram_t2p
 	for (int i = 0; i < 4; i++) {
 		char temp = ((hex_data >> (3 - i) * 4) & 0xF);
 		hex_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
@@ -426,7 +433,8 @@ static word_t make_hex_chars(word_t hex_data, char* hex_chars) {
 	return 5;
 }
 
-static word_t make_disp_out(word_t addrM, word_t dataM, char* out) {
+static word_t make_disp_out(word_t addrM, word_t dataM, char out[10]) {
+	#pragma HLS INTERFACE ap_memory port=out storage_type=ram_t2p
 	static word_t last_data_ = 0;
 	if (addrM >= 0x4000) {
 		unsigned short addr = addrM - 0x4000;
@@ -464,8 +472,8 @@ static word_t make_disp_out(word_t addrM, word_t dataM, char* out) {
 void cpu_wrapper2(word_t command, bool command_execute,
 		word_t read_data[16], word_t& num_ret, word_t& ret_status,
 		word_t disp_out[2], bool auto_continue, bool key_input, word_t key_code) {
-#pragma HLS INTERFACE ap_memory port=read_data storage_type=ram_t2p
-#pragma HLS INTERFACE ap_memory port=disp_out storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=read_data storage_type=ram_t2p
+	#pragma HLS INTERFACE ap_memory port=disp_out storage_type=ram_t2p
 
 	// CPU interface signals
     static hls::stream<word_t> command_in;
@@ -503,10 +511,15 @@ void cpu_wrapper2(word_t command, bool command_execute,
 	}
 }
 
-void uart_bridge(const char char_in[TOKEN_SIZE], volatile char& auto_continue_requested,
-		char char_out[OUT_CHAR_SIZE], word_t& num_char_out, word_t& num_disp_out, volatile char& key_requested) {
-	#pragma HLS INTERFACE ap_memory port=char_in storage_type=ram_2p
-	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
+void uart_bridge(
+		const uint32_t char_in4,
+		volatile char& auto_continue_requested,
+		char char_out[OUT_CHAR_SIZE],
+		word_t& num_char_out,
+		word_t& num_disp_out,
+		volatile char& key_requested,
+		volatile word_t& debug_command_,
+		volatile char& debug_phase_) {
 
 	bool command_execute = false;
 	word_t read_data[16];
@@ -526,27 +539,36 @@ void uart_bridge(const char char_in[TOKEN_SIZE], volatile char& auto_continue_re
 	auto_continue_requested = false;
 	key_requested = false;
 
-	if (char_in[0] == 'K') {
+	debug_phase_ = 0xB0;
+	if ((char_in4 & 0xFF) == 'K') {
+		debug_phase_ = 0xB1;
 		key_input = true;
 		command_execute = true;
 		auto_continue = true;
-		key_code = (char_in[1]-'0')*100+(char_in[2]-'0')*10+(char_in[3]-'0');
+		key_code = (((char_in4 >> 8)&0xFF)-'0')*100+(((char_in4 >> 16)&0xFF)-'0')*10+(((char_in4 >> 24)&0xFF)-'0');
 	}
-	else if (char_in[0] == 'N') {
+	else if ((char_in4 & 0xFF) == 'N') {
+		debug_phase_ = 0xB2;
 		command_execute = true;
 		auto_continue = true;
-	} else if (char_in[0] == 'Z') {
+	} else if ((char_in4 & 0xFF) == 'Z') {
+		debug_phase_ = 0xB3;
 		command_execute = true;
 	}
-	word_t command = make_hex_bin(char_in);
+	word_t command = make_hex_bin(char_in4);
+	debug_command_ = command;
 	cpu_wrapper2(command, command_execute, read_data, num_ret, ret_status,
 			disp_out, auto_continue, key_input, key_code);
+	debug_phase_ = 0xB4;
 	if (ret_status == BREAK_REASON_DISP) {
+		debug_phase_ = 0xB5;
 		num_disp_out = make_disp_out(disp_out[0], disp_out[1], &char_out[0]);
 		auto_continue_requested = true;
 	} else if (ret_status == BREAK_REASON_KEYIN) {
+		debug_phase_ = 0xB6;
 		key_requested = true;
 	} else if (command_execute) {
+		debug_phase_ = 0xB7;
 		num_char_out += make_hex_chars(num_ret, &char_out[0]);
 		for (int i = 0; i < num_ret; i++) {
 			num_char_out += make_hex_chars(read_data[i], &char_out[(i+1)*5]);
@@ -582,23 +604,50 @@ static bool send_str(volatile unsigned int *uart_reg, const char s[TOKEN_SIZE], 
 	return false;
 }
 
-static bool get_token(const ap_uint<1>& interrupt,
+static bool get_token(
+		const ap_uint<1>& interrupt,
 	    volatile unsigned int *uart_reg,
 		volatile char& debug_rx_data_,
-		char rx_buf[TOKEN_SIZE], int& rx_bufp
-) {
+		volatile char& debug_phase_,
+		volatile char& rx0,
+		volatile char& rx1,
+		volatile char& rx2,
+		volatile char& rx3) {
 	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
-	#pragma HLS INTERFACE ap_memory port=rx_buf storage_type=ram_t2p
 
-	while (uart_reg[STAT_REG_OFFSET] & 0x00000001) {
-		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-		rx_buf[rx_bufp++] = debug_rx_data_;
-		if (rx_bufp == TOKEN_SIZE) {
-			rx_bufp = 0;
-			return true;
+	while (1) {
+		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
+			debug_phase_ = 0xC0;
+			rx0 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+			break;
 		}
 	}
-	return false;
+
+	while (1) {
+		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
+			debug_phase_ = 0xC1;
+			rx1 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+			break;
+		}
+	}
+
+	while (1) {
+		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
+			debug_phase_ = 0xC2;
+			rx2 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+			break;
+		}
+	}
+
+	while (1) {
+		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
+			debug_phase_ = 0xC3;
+			rx3 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+			break;
+		}
+	}
+
+	return true;
 }
 
 static void process_output(
@@ -634,7 +683,7 @@ static void process_output(
 }
 
 static void execute_command(
-		const char command_in[4],
+		uint32_t command_in4,
 		volatile char& auto_continue_requested_,
 		volatile char& key_requested,
 		volatile unsigned int *uart_reg,
@@ -646,6 +695,7 @@ static void execute_command(
 		volatile char& num_char_out_,
 		char char_out_[OUT_CHAR_SIZE],
 		volatile char& debug_phase_,
+		volatile word_t& debug_command_,
 		volatile char& debug_rx_data_) {
 	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
 	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
@@ -653,8 +703,10 @@ static void execute_command(
 
 	// コマンド実行
 	debug_phase_ = 0xE0;
-	uart_bridge(command_in, auto_continue_requested_,
-			char_out, num_char_out, num_disp_out, key_requested);
+	uart_bridge(command_in4, auto_continue_requested_,
+			char_out, num_char_out, num_disp_out, key_requested,
+			debug_command_, debug_phase_);
+	debug_phase_ = 0xE1;
 	process_output(uart_reg,
 			num_disp_out, num_char_out, out_p, char_out,
 			num_disp_out_, num_char_out_, char_out_,
@@ -665,14 +717,20 @@ static void uart_execute(
 		const ap_uint<1>& interrupt,
 		volatile unsigned int *uart_reg,
 		volatile char& auto_continue_requested_,
+		volatile char& keyin_requested_,
 		volatile char& num_disp_out_,
 		volatile char& num_char_out_,
 		char char_out_[OUT_CHAR_SIZE],
-		char commandin_available_,
+		volatile char& commandin_available_,
 		const char commandin_[TOKEN_SIZE],
-		char keyin_available_,
+		volatile char& keyin_available_,
 		const char keyin_[TOKEN_SIZE],
 		volatile char& debug_phase_,
+		volatile char& ic0_,
+		volatile char& ic1_,
+		volatile char& ic2_,
+		volatile char& ic3_,
+		volatile word_t& debug_command_,
 		volatile char& debug_rx_data_) {
 	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
 	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
@@ -687,10 +745,6 @@ static void uart_execute(
     static word_t num_disp_out = 0;
     static const char no_keyin[TOKEN_SIZE] = {'K','0','0','0'};
 
-    static char rx_buf[TOKEN_SIZE] = {0};
-	#pragma HLS BIND_STORAGE variable=rx_buf type=RAM_T2P impl=BRAM
-
-    static int rx_bufp = 0;
     static int out_p = 0;
     static int key_in_count = 0;
     num_disp_out_ = 0;
@@ -698,32 +752,39 @@ static void uart_execute(
 
 	if (key_requested) {
 	    // Key 入力
-		debug_phase_ = phase = 0xE1;
 		if (keyin_available_) {
-			uart_bridge(keyin_, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
-		} else if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
-			uart_bridge(rx_buf, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
-		} else {
-			uart_bridge(no_keyin, auto_continue_requested_, char_out, num_char_out, num_disp_out, key_requested);
+			debug_phase_ = phase = 0xD1;
+			uint32_t key_in4 = (keyin_[3] << 24) + (keyin_[2] << 16) + (keyin_[1] << 8) + keyin_[0];
+			execute_command(key_in4, auto_continue_requested_, key_requested,
+					uart_reg, num_disp_out, num_char_out, out_p,
+					char_out, num_disp_out_, num_char_out_, char_out_,
+					debug_phase_, debug_command_, debug_rx_data_);
+			keyin_available_ = false; /* consumed */
+		} else if (get_token(interrupt, uart_reg, debug_rx_data_, debug_phase_, ic0_, ic1_, ic2_, ic3_)) {
+			debug_phase_ = phase = 0xD2;
+			uint32_t key_in4 = (ic3_ << 24) + (ic2_ << 16) + (ic1_ << 8) + ic0_;
+			execute_command(key_in4, auto_continue_requested_, key_requested,
+					uart_reg, num_disp_out, num_char_out, out_p,
+					char_out, num_disp_out_, num_char_out_, char_out_,
+					debug_phase_, debug_command_, debug_rx_data_);
 		}
-		process_output(uart_reg,
-				num_disp_out, num_char_out, out_p, char_out,
-				num_disp_out_, num_char_out_, char_out_,
-				debug_phase_, debug_rx_data_);
 	} else {
 		if (commandin_available_) {
-			execute_command(commandin_, auto_continue_requested_, key_requested,
+			uint32_t command_in4 = (commandin_[3] << 24) + (commandin_[2] << 16) + (commandin_[1] << 8) + commandin_[0];
+			execute_command(command_in4, auto_continue_requested_, key_requested,
 					uart_reg, num_disp_out, num_char_out, out_p,
 					char_out, num_disp_out_, num_char_out_, char_out_,
-					debug_phase_, debug_rx_data_);
-
-		} else if (get_token(interrupt, uart_reg, debug_rx_data_, rx_buf, rx_bufp)) {
-			execute_command(rx_buf, auto_continue_requested_, key_requested,
+					debug_phase_, debug_command_, debug_rx_data_);
+			commandin_available_ = false; /* consumed */
+		} else if (get_token(interrupt, uart_reg, debug_rx_data_, debug_phase_, ic0_, ic1_, ic2_, ic3_)) {
+			uint32_t command_in4 = (ic3_ << 24) + (ic2_ << 16) + (ic1_ << 8) + ic0_;
+			execute_command(command_in4, auto_continue_requested_, key_requested,
 					uart_reg, num_disp_out, num_char_out, out_p,
 					char_out, num_disp_out_, num_char_out_, char_out_,
-					debug_phase_, debug_rx_data_);
+					debug_phase_, debug_command_, debug_rx_data_);
 		}
 	}
+	keyin_requested_ = key_requested;
 }
 
 void uart_if(
@@ -731,15 +792,21 @@ void uart_if(
 	const ap_uint<1>& interrupt,
 	volatile unsigned int *uart_reg,
 	volatile char& auto_continue_requested_,
+	volatile char& keyin_requested_,
 	volatile char& num_disp_out_,
 	volatile char& num_char_out_,
 	char char_out_[OUT_CHAR_SIZE],
-	volatile char commandin_available_,
+	volatile char& commandin_available_,
 	const char commandin_[TOKEN_SIZE],
-	volatile char keyin_available_,
+	volatile char& keyin_available_,
 	const char keyin_[TOKEN_SIZE],
 	volatile char& debug_phase_,
 	volatile char& debug_rx_data_,
+	volatile char& ic0_,
+	volatile char& ic1_,
+	volatile char& ic2_,
+	volatile char& ic3_,
+	volatile word_t& debug_command_,
 	char debug_injection
 ) {
 	#pragma HLS INTERFACE ap_none port=start
@@ -774,10 +841,11 @@ void uart_if(
 
 	} else if (start) {
 		debug_phase_ = phase = 6;
-		uart_execute(interrupt, uart_reg, auto_continue_requested_,
+		uart_execute(interrupt, uart_reg, auto_continue_requested_, keyin_requested_,
 				num_disp_out_, num_char_out_, char_out_,
 				commandin_available_, commandin_,
 				keyin_available_, keyin_,
-				debug_phase_, debug_rx_data_);
+				debug_phase_, ic0_, ic1_, ic2_, ic3_,
+				debug_command_, debug_rx_data_);
     }
 }

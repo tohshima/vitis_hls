@@ -262,6 +262,7 @@ int main() {
 	ap_uint<1> interrupt = 0;
     volatile unsigned int uart_reg[4] = {0};
     volatile char auto_continue_requested_ = false;
+    volatile char keyin_requested_ = false;
     volatile char num_disp_out_ = 0;
     volatile char num_char_out_ = 0;
     char char_out_[OUT_CHAR_SIZE];
@@ -271,13 +272,20 @@ int main() {
     char keyin_[4];
 	volatile char debug_phase_ = 0;
 	volatile char debug_rx_data_ = 0;
+	volatile char ic0_ = 0;
+	volatile char ic1_ = 0;
+	volatile char ic2_ = 0;
+	volatile char ic3_ = 0;
+	volatile word_t debug_command_ = 0;
 	volatile char debug_injection = 0;
     static const char auto_continue[TOKEN_SIZE] = {'N','0','0','0'};
+    static const char no_keyin[TOKEN_SIZE] = {'K', '0', '0', '0'};
 
-	uart_if(start, interrupt, uart_reg, auto_continue_requested_,
+	uart_if(start, interrupt, uart_reg, auto_continue_requested_, keyin_requested_,
 			num_disp_out_, num_char_out_, char_out_,
 			commandin_available_, commandin_, keyin_available_, keyin_,
-			debug_phase_, debug_rx_data_, debug_injection); // initialization
+			debug_phase_, debug_rx_data_, ic0_, ic1_, ic2_, ic3_,
+			debug_command_, debug_injection); // initialization
     while (1) {
     	// 入力
     	commandin_available_ = false;
@@ -285,29 +293,44 @@ int main() {
     	if (auto_continue_requested_) {
 			commandin_available_ = true;
     		memcpy(commandin_, auto_continue, TOKEN_SIZE);
-    	} else if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) && (bytes_read == sizeof(read_buf))) {
-    		if (read_buf[0] == 'K') {
-    			keyin_available_ = true;
-    			memcpy(keyin_, read_buf, sizeof(keyin_));
-    		} else {
-    			commandin_available_ = true;
-    			memcpy(commandin_, read_buf, sizeof(commandin_));
+    	} else if (keyin_requested_) {
+    		keyin_available_ = true;
+    		memcpy(keyin_, no_keyin, sizeof(keyin_));
+			if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
+    				(bytes_read == sizeof(read_buf))) {
+				if (read_buf[0] == 'K') {
+					memcpy(keyin_, read_buf, sizeof(keyin_));
+				}
+    		}
+    	} else {
+    		if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
+    				(bytes_read == sizeof(read_buf))) {
+					if (read_buf[0] == 'X') {
+						return 0;
+					}
+					if (read_buf[0] == 'K') {
+						keyin_available_ = true;
+						memcpy(keyin_, read_buf, sizeof(keyin_));
+					} else {
+						commandin_available_ = true;
+						memcpy(commandin_, read_buf, sizeof(commandin_));
+					}
     		}
 		}
-    	// 実行
-    	num_disp_out_ = 0;
-    	num_char_out_ = 0;
-    	auto_continue_requested_ = false;
-		uart_if(start, interrupt, uart_reg, auto_continue_requested_,
-				num_disp_out_, num_char_out_, char_out_,
-				commandin_available_, commandin_, keyin_available_, keyin_,
-				debug_phase_, debug_rx_data_, debug_injection);
-		// 出力
-		if (num_disp_out_) {
-			uart_comm.write_data(char_out_, num_disp_out_);
-		} else if (num_char_out_) {
-			uart_comm.write_data(char_out_, num_char_out_);
-		}
+    	if (auto_continue_requested_ || keyin_available_ || commandin_available_) {
+			// 実行
+			uart_if(start, interrupt, uart_reg, auto_continue_requested_, keyin_requested_,
+					num_disp_out_, num_char_out_, char_out_,
+					commandin_available_, commandin_, keyin_available_, keyin_,
+					debug_phase_, debug_rx_data_, ic0_, ic1_, ic2_, ic3_,
+					debug_command_, debug_injection);
+			// 出力
+			if (num_disp_out_) {
+				uart_comm.write_data(char_out_, num_disp_out_);
+			} else if (num_char_out_) {
+				uart_comm.write_data(char_out_, num_char_out_);
+			}
+    	}
     }
 #else
     uart_bridge(uart_comm, command_in, command_out);

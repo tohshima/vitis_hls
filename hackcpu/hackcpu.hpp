@@ -116,14 +116,20 @@ void uart_if(
 	const ap_uint<1>& interrupt,
 	volatile unsigned int *uart_reg,
 	volatile char& auto_continue_requested_,
+	volatile char& keyin_requested_,
 	volatile char& num_disp_out_,
 	volatile char& num_char_out_,
 	char char_out_[OUT_CHAR_SIZE],
-	volatile char commandin_available_,
+	volatile char& commandin_available_, /* deasserted if consumed */
 	const char commandin_[TOKEN_SIZE],
-	volatile char keyin_available_,
+	volatile char& keyin_available_, /* deasserted if consumed */
 	const char keyin_[TOKEN_SIZE],
 	volatile char& debug_phase_,
 	volatile char& debug_rx_data_,
+	volatile char& ic0_,
+	volatile char& ic1_,
+	volatile char& ic2_,
+	volatile char& ic3_,
+	volatile word_t& debug_command_,
 	char debug_injection
 );
