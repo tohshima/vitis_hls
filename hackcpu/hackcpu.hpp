@@ -111,25 +111,27 @@ void uart_bridge(const char char_in[4], bool& auto_continue_requested,
 #define TOKEN_SIZE (4)
 #define OUT_CHAR_SIZE (108)
 
+typedef ap_uint<8*TOKEN_SIZE> token_word_t;
+
 void uart_if(
 	bool start,
-	const ap_uint<1>& interrupt,
 	volatile unsigned int *uart_reg,
-	volatile char& auto_continue_requested_,
-	volatile char& keyin_requested_,
-	volatile char& num_disp_out_,
-	volatile char& num_char_out_,
-	char char_out_[OUT_CHAR_SIZE],
-	volatile char& commandin_available_, /* deasserted if consumed */
-	const char commandin_[TOKEN_SIZE],
-	volatile char& keyin_available_, /* deasserted if consumed */
-	const char keyin_[TOKEN_SIZE],
-	volatile char& debug_phase_,
-	volatile char& debug_rx_data_,
-	volatile char& ic0_,
-	volatile char& ic1_,
-	volatile char& ic2_,
-	volatile char& ic3_,
-	volatile word_t& debug_command_,
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<char>& uart_out,
+	volatile char& debug_phase__,
+	volatile word_t& debug_command__,
+	volatile char& debug_rx_data__,
 	char debug_injection
+);
+void uart_in_task(
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<word_t>& command_in
+);
+void comp_task(
+	hls::stream<word_t>& command_in,
+	hls::stream<word_t>& command_out
+);
+void uart_out_task(
+	hls::stream<word_t>& command_out,
+	hls::stream<char>& uart_out
 );

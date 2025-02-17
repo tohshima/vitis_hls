@@ -4,12 +4,14 @@
 #include <vector>
 #include <string>
 #include <iomanip>
+#include <hls_task.h>
 #include <hls_stream.h>
 #include "../common/uart_comm.hpp"
 #include "revasm.hpp"
 #include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
 
-#define USE_COM "COM2"
+
+#if 0
 
 void read_rom_file(const std::string& filename,
              hls::stream<word_t>& command_in,
@@ -171,8 +173,6 @@ int compare(hls::stream<word_t>& command_in, hls::stream<word_t>& command_out, b
     return 0;
 }
 
-#if 0
-
 static word_t check_key_input(uart_comm& uart_comm) {
 	char read_buf[4] = {0};
 	DWORD bytes_read;
@@ -253,85 +253,35 @@ static void uart_bridge(uart_comm& uart_comm) {
 
 int main() {
 
-	uart_comm uart_comm("\\\\.\\"USE_COM);  // COM2ポートを開く
-
 #if 1
-    char read_buf[TOKEN_SIZE];
-    DWORD bytes_read = 0;
 	bool start = true;
-	ap_uint<1> interrupt = 0;
+	//ap_uint<1> interrupt = 0;
     volatile unsigned int uart_reg[4] = {0};
-    volatile char auto_continue_requested_ = false;
-    volatile char keyin_requested_ = false;
-    volatile char num_disp_out_ = 0;
-    volatile char num_char_out_ = 0;
-    char char_out_[OUT_CHAR_SIZE];
-    volatile char commandin_available_ = false;
-    char commandin_[4];
-    volatile char keyin_available_ = false;
-    char keyin_[4];
-	volatile char debug_phase_ = 0;
-	volatile char debug_rx_data_ = 0;
-	volatile char ic0_ = 0;
-	volatile char ic1_ = 0;
-	volatile char ic2_ = 0;
-	volatile char ic3_ = 0;
-	volatile word_t debug_command_ = 0;
+	volatile char debug_phase__ = 0;
+	volatile word_t debug_command__ = 0;
+	volatile char debug_rx_data__ = 0;
 	volatile char debug_injection = 0;
-    static const char auto_continue[TOKEN_SIZE] = {'N','0','0','0'};
-    static const char no_keyin[TOKEN_SIZE] = {'K', '0', '0', '0'};
 
-	uart_if(start, interrupt, uart_reg, auto_continue_requested_, keyin_requested_,
-			num_disp_out_, num_char_out_, char_out_,
-			commandin_available_, commandin_, keyin_available_, keyin_,
-			debug_phase_, debug_rx_data_, ic0_, ic1_, ic2_, ic3_,
-			debug_command_, debug_injection); // initialization
-    while (1) {
-    	// 入力
-    	commandin_available_ = false;
-    	keyin_available_ = false;
-    	if (auto_continue_requested_) {
-			commandin_available_ = true;
-    		memcpy(commandin_, auto_continue, TOKEN_SIZE);
-    	} else if (keyin_requested_) {
-    		keyin_available_ = true;
-    		memcpy(keyin_, no_keyin, sizeof(keyin_));
-			if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
-    				(bytes_read == sizeof(read_buf))) {
-				if (read_buf[0] == 'K') {
-					memcpy(keyin_, read_buf, sizeof(keyin_));
-				}
-    		}
-    	} else {
-    		if ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
-    				(bytes_read == sizeof(read_buf))) {
-					if (read_buf[0] == 'X') {
-						return 0;
-					}
-					if (read_buf[0] == 'K') {
-						keyin_available_ = true;
-						memcpy(keyin_, read_buf, sizeof(keyin_));
-					} else {
-						commandin_available_ = true;
-						memcpy(commandin_, read_buf, sizeof(commandin_));
-					}
-    		}
-		}
-    	if (auto_continue_requested_ || keyin_available_ || commandin_available_) {
-			// 実行
-			uart_if(start, interrupt, uart_reg, auto_continue_requested_, keyin_requested_,
-					num_disp_out_, num_char_out_, char_out_,
-					commandin_available_, commandin_, keyin_available_, keyin_,
-					debug_phase_, debug_rx_data_, ic0_, ic1_, ic2_, ic3_,
-					debug_command_, debug_injection);
-			// 出力
-			if (num_disp_out_) {
-				uart_comm.write_data(char_out_, num_disp_out_);
-			} else if (num_char_out_) {
-				uart_comm.write_data(char_out_, num_char_out_);
-			}
-    	}
-    }
+	static hls_thread_local hls::stream<token_word_t> uart_in;
+	static hls_thread_local hls::stream<char> uart_out;
+	// CPU interface signals
+    static hls_thread_local hls::stream<word_t> command_in;
+    static hls_thread_local hls::stream<word_t> command_out;
+
+	hls_thread_local hls::task t1(uart_in_task, uart_in, command_in);
+	hls_thread_local hls::task t2(comp_task, command_in, command_out);
+	hls_thread_local hls::task t3(uart_out_task, command_out, uart_out);
+
+	uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_command__, debug_rx_data__, debug_injection);
+	while(1) {
+		uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_command__, debug_rx_data__, debug_injection);
+		debug_phase__ = 7;
+		//uart_in_task(uart_in, command_in);
+		debug_phase__ = 8;
+		//comp_task(command_in, command_out);
+		debug_phase__ = 9;
+		//uart_out_task(command_out, uart_out);
+	}
 #else
     uart_bridge(uart_comm, command_in, command_out);
 #endif

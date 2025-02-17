@@ -1,5 +1,10 @@
 #include <string.h>
+#include <hls_task.h>
+#include <hls_stream.h>
 #include "hackcpu.hpp"
+#ifndef __SYNTHESIS__
+#include "uart_comm.hpp"
+#endif
 
 static void comp_core(word_t instruction, word_t x, word_t y, word_t &alu_out) {
     switch (instruction(11, 6)) {
@@ -258,153 +263,289 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
     static ap_uint<1> reset = 1;
     static ap_uint<1> halt = 1;
 
-    while (!command_packet_in.empty()) {
-        control_command_e command = (control_command_e)command_packet_in.read().to_int();
-        switch(command) {
-            case NORMAL_OPERATION:
-            	cycle_to_stop =  (break_cycle_interval > 0)? cycle+break_cycle_interval:  0xFFFFFFFFFFFFFFFFull;
-                halt = 0;
-                SEND_NUM_RETVALS(0);
-                break;
-            case SET_RESET_CONFIG:
-            {
-            	while(command_packet_in.empty()) {}
-                word_t bitmap = command_packet_in.read();
-                reset = (bitmap & RESET_BIT_RESET)? 1: 0;
-                halt = (bitmap & RESET_BIT_HALT)? 1: 0;
-                SEND_NUM_RETVALS(0);
-                break;
-            }
-            case GET_RESET_CONFIG:
-            {
-                word_t bitmap = 0;
-                if (reset) bitmap |= RESET_BIT_RESET;
-                if (halt) bitmap |= RESET_BIT_HALT;
-                SEND_NUM_RETVALS(1);
-                command_packet_out.write(bitmap);
-                break;
-            }
-            case WRITE_TO_IRAM: 
-            {
-            	while(command_packet_in.empty()) {}
-                addr_t address = (addr_t)command_packet_in.read();
-            	while(command_packet_in.empty()) {}
-                word_t data = command_packet_in.read();
-                i_ram[address] = data;
-                SEND_NUM_RETVALS(0);
-                break;
-            }
-            case LOAD_TO_IRAM: 
-            {
-            	while(command_packet_in.empty()) {}
-                addr_t address = (addr_t)command_packet_in.read();
-            	while(command_packet_in.empty()) {}
-                word_t length = command_packet_in.read();
-                for (word_t i = 0; i < length; i++) {
-                	while(command_packet_in.empty()) {}
-                    word_t data = command_packet_in.read();
-                    i_ram[address+i] = data;
-                }
-                SEND_NUM_RETVALS(0);
-                break;
-            }
-            case READ_FROM_IRAM:
-            {
-            	while(command_packet_in.empty()) {}
-                addr_t address = (addr_t)command_packet_in.read();
-                SEND_NUM_RETVALS(1);
-                command_packet_out.write(i_ram[address]);
-                break;
-            }
-            case WRITE_TO_DRAM: 
-            {
-            	while(command_packet_in.empty()) {}
-                addr_t address = (addr_t)command_packet_in.read();
-            	while(command_packet_in.empty()) {}
-                word_t data = command_packet_in.read();
-                d_ram[address] = data;
-                SEND_NUM_RETVALS(0);
-                break;
-            }
-            case READ_FROM_DRAM: 
-            {
-            	while(command_packet_in.empty()) {}
-                addr_t address = (addr_t)command_packet_in.read();
-                SEND_NUM_RETVALS(1);
-                command_packet_out.write(d_ram[address]);
-                break;
-            }
-            case STEP_EXECUTION:
-                cycle_to_stop = cycle+1;
-                halt = 0;
-                break_cycle_interval = 0;
-                break_condition_bitmap &= ~BREAK_CONDITION_BIT_INTERVAL;
-                SEND_NUM_RETVALS(0);
-                break;
-            case SET_BREAK_CONDITION:
-            	while(command_packet_in.empty()) {}
-                break_condition_bitmap = command_packet_in.read();
-                if (break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) {
-                	break_cycle_interval = command_packet_in.read().to_uint64();
-                }
-                SEND_NUM_RETVALS(0);
-                break;
-            case MULTI_STEP_EXECUTION:
-            {
-            	while(command_packet_in.empty()) {}
-                word_t steps = command_packet_in.read();
-                cycle_to_stop = cycle+steps;
-                halt = 0;
-                SEND_NUM_RETVALS(0);
-                break;
-            }
-            case GET_DEBUG_INFO:
-            {
-            	while(command_packet_in.empty()) {}
-                word_t bitmap = command_packet_in.read();
-                word_t bitcnt = ((bitmap & DINFO_BIT_CYCLE) ? 3:0) + bit_count(bitmap);
-                SEND_NUM_RETVALS(bitcnt);
+    static int state = -1; // -1: wait for command receive 0: command received, 1: wait for args receive, 2: arg received
+    static int num_args = 0;
+    static control_command_e curr_commmand = NO_OPERATION;
 
-                if (bitmap & DINFO_BIT_CYCLE) {
-                    command_packet_out.write(cycle & 0xFFFF);
-                    command_packet_out.write((cycle >> 16) & 0xFFFF);
-                    command_packet_out.write((cycle >> 32) & 0xFFFF);
-                    command_packet_out.write((cycle >> 48) & 0xFFFF);
-                }
-                if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
-                if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
-                if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
-                if (bitmap & DINFO_BIT_PC) command_packet_out.write(pc_of_cycle_start);
-                if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
-                if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
-                if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
-                if (bitmap & DINFO_BIT_INST1) command_packet_out.write(first_inst);
-                if (bitmap & DINFO_BIT_INST2) command_packet_out.write(next_inst);
-                if (bitmap & DINFO_BIT_SP) command_packet_out.write(d_ram[0]);
-                break;
-            }
+	if (state == -1) {
+		//if (!command_packet_in.empty()) {
+			curr_commmand = (control_command_e)command_packet_in.read().to_int();
+			state = 0;
+		//}
+	}
+	if ((state == 0) || (state == 1)) {
+		switch(curr_commmand) {
+			case NORMAL_OPERATION:
+				cycle_to_stop =  (break_cycle_interval > 0)? cycle+break_cycle_interval:  0xFFFFFFFFFFFFFFFFull;
+				halt = 0;
+				//SEND_NUM_RETVALS(0);
+				state = 2;
+				break;
+			case SET_RESET_CONFIG:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 1;
+				}
+				if (state == 1) {
+					if (num_args /*&& !command_packet_in.empty()*/) {
+						word_t bitmap = command_packet_in.read();
+						reset = (bitmap & RESET_BIT_RESET)? 1: 0;
+						halt = (bitmap & RESET_BIT_HALT)? 1: 0;
+						SEND_NUM_RETVALS(0);
+						state = 2;
+					}
+				}
+				break;
+			}
+			case GET_RESET_CONFIG:
+			{
+				word_t bitmap = 0;
+				if (reset) bitmap |= RESET_BIT_RESET;
+				if (halt) bitmap |= RESET_BIT_HALT;
+				SEND_NUM_RETVALS(1);
+				state = 2;
+				command_packet_out.write(bitmap);
+				break;
+			}
+			case WRITE_TO_IRAM:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 2;
+				}
+				if (state == 1) {
+					static addr_t w2i_address;
+					while (num_args /*&& !command_packet_in.empty()*/) {
+						if (num_args == 2) {
+							w2i_address = (addr_t)command_packet_in.read();
+						} else if (num_args == 1) {
+							word_t data = command_packet_in.read();
+							i_ram[w2i_address] = data;
+							SEND_NUM_RETVALS(0);
+							state = 2;
+						}
+						num_args--;
+					}
+				}
+				break;
+			}
+			case LOAD_TO_IRAM:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 2;
+				}
+				if (state == 1) {
+					static addr_t l2i_address = 0;
+					static word_t l2i_length = 0;
+					static bool l2i_got_length = false;
+					while (num_args /*&& !command_packet_in.empty()*/) {
+						if (!l2i_got_length) {
+							if (num_args == 2) {
+								l2i_address = (addr_t)command_packet_in.read();
+							} else if (num_args == 1) {
+								l2i_length = command_packet_in.read();
+								num_args = l2i_length;
+								l2i_got_length = true;
+								continue;
+							}
+						} else {
+							word_t data = command_packet_in.read();
+							i_ram[l2i_address+l2i_length-num_args] = data;
+						}
+						num_args--;
+					}
+					if (num_args == 0) {
+						SEND_NUM_RETVALS(0);
+						l2i_got_length = false;
+						state = 2;
+					}
+				}
+				break;
+			}
+			case READ_FROM_IRAM:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 1;
+				}
+				if (state == 1) {
+					if (num_args /*&& !command_packet_in.empty()*/) {
+						addr_t rfi_address = (addr_t)command_packet_in.read();
+						SEND_NUM_RETVALS(1);
+						command_packet_out.write(i_ram[rfi_address]);
+						state = 2;
+					}
+				}
+				break;
+			}
+			case WRITE_TO_DRAM:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 2;
+				}
+				if (state == 1) {
+					static addr_t w2d_address = 0;
+					while (num_args /*&& !command_packet_in.empty()*/) {
+						if (num_args == 2) {
+							w2d_address = (addr_t)command_packet_in.read();
+						} else if (num_args == 1) {
+							word_t data = command_packet_in.read();
+							d_ram[w2d_address] = data;
+							SEND_NUM_RETVALS(0);
+							state = 2;
+						}
+						num_args--;
+					}
+				}
+				break;
+			}
+			case READ_FROM_DRAM:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 1;
+				}
+				if (state == 1) {
+					if (num_args /*&& !command_packet_in.empty()*/) {
+						addr_t rfd_address = (addr_t)command_packet_in.read();
+						SEND_NUM_RETVALS(1);
+						command_packet_out.write(d_ram[rfd_address]);
+						state = 2;
+					}
+				}
+				break;
+			}
+			case STEP_EXECUTION:
+				cycle_to_stop = cycle+1;
+				halt = 0;
+				break_cycle_interval = 0;
+				break_condition_bitmap &= ~BREAK_CONDITION_BIT_INTERVAL;
+				SEND_NUM_RETVALS(0);
+				state = 2;
+				break;
+			case SET_BREAK_CONDITION:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 1;
+				}
+				if (state == 1) {
+					static bool got_bcb = false;
+					if (!got_bcb /*&& !command_packet_in.empty()*/) {
+						break_condition_bitmap = command_packet_in.read();
+						got_bcb = true;
+					}
+					if (break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) {
+						if (got_bcb /*&& !command_packet_in.empty()*/) {
+							break_cycle_interval = command_packet_in.read().to_uint64();
+							SEND_NUM_RETVALS(0);
+							got_bcb = false;
+							state = 2;
+						}
+					} else {
+						if (got_bcb) {
+							SEND_NUM_RETVALS(0);
+							got_bcb = false;
+							state = 2;
+						}
+					}
+				}
+				break;
+			}
+			case MULTI_STEP_EXECUTION:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 1;
+				}
+				if (state == 1) {
+					if (num_args /*&& !command_packet_in.empty()*/) {
+						word_t steps = command_packet_in.read();
+						cycle_to_stop = cycle+steps;
+						halt = 0;
+						SEND_NUM_RETVALS(0);
+						state = 2;
+					}
+				}
+				break;
+			}
+			case GET_DEBUG_INFO:
+			{
+				if (state == 0) {
+					state = 1;
+					num_args = 1;
+				}
+				if (state == 1) {
+					if (num_args /*&& !command_packet_in.empty()*/) {
+						word_t bitmap = command_packet_in.read();
+						word_t bitcnt = ((bitmap & DINFO_BIT_CYCLE) ? 3:0) + bit_count(bitmap);
+						SEND_NUM_RETVALS(bitcnt);
+						state = 2;
 
-            default:
-            	halt = 1;
-            	SEND_NUM_RETVALS(0);
-                break;
-        }
-        word_t break_reason = BREAK_REASON_NOP;
-        if (reset || !halt) {
-            break_reason = cpu(i_ram, d_ram, reset);
-            if ((break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) &&
-            		(break_reason == BREAK_REASON_CYCLE)) {
-            	break_reason = BREAK_REASON_INTERVAL;
-            }
-            halt = 1;
-        }
-        command_packet_out.write(break_reason);
-        if ((break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) && (break_reason == BREAK_REASON_DISP)) {
-        	command_packet_out.write(addressM);
-        	command_packet_out.write(outM);
-        }
-    }
+						if (bitmap & DINFO_BIT_CYCLE) {
+							command_packet_out.write(cycle & 0xFFFF);
+							command_packet_out.write((cycle >> 16) & 0xFFFF);
+							command_packet_out.write((cycle >> 32) & 0xFFFF);
+							command_packet_out.write((cycle >> 48) & 0xFFFF);
+						}
+						if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
+						if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
+						if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
+						if (bitmap & DINFO_BIT_PC) command_packet_out.write(pc_of_cycle_start);
+						if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
+						if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
+						if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
+						if (bitmap & DINFO_BIT_INST1) command_packet_out.write(first_inst);
+						if (bitmap & DINFO_BIT_INST2) command_packet_out.write(next_inst);
+						if (bitmap & DINFO_BIT_SP) command_packet_out.write(d_ram[0]);
+					}
+				}
+				break;
+			}
+
+			default:
+				halt = 1;
+				SEND_NUM_RETVALS(0);
+				state = 0;
+				num_args = 0;
+				break;
+		}
+	}
+	if (state == 2) {
+		word_t break_reason = BREAK_REASON_NOP;
+		if (reset || !halt) {
+			break_reason = cpu(i_ram, d_ram, reset);
+			if ((break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) &&
+					(break_reason == BREAK_REASON_CYCLE)) {
+				break_reason = BREAK_REASON_INTERVAL;
+			}
+			halt = 1;
+		}
+		if ((break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) && (break_reason == BREAK_REASON_DISP)) {
+			SEND_NUM_RETVALS(0xFFFF);
+			command_packet_out.write(addressM);
+			command_packet_out.write(outM);
+			curr_commmand = NORMAL_OPERATION;
+			state = 0; // re-execute NOMAL_OPERATION for next call without response to host
+		} else {
+			if (curr_commmand == NORMAL_OPERATION) {
+				SEND_NUM_RETVALS(0);
+			}
+			command_packet_out.write(break_reason);
+			state = -1;
+		}
+	}
 }
+
+
+volatile char debug_phase_t1_ = 0;
+volatile char debug_phase_t2_ = 0;
+volatile char debug_phase_t3_ = 0;
+volatile char debug_rx_data_ = 0;
+volatile word_t debug_command_ = 0;
 
 static char convert2hex(char c) {
 	char h = 0;
@@ -413,7 +554,7 @@ static char convert2hex(char c) {
 	else if ((c >= 'A') && (c <= 'F')) { h = (c-'A'+10); }
 	return h;
 }
-word_t make_hex_bin(uint32_t hex_chars4) {
+static word_t make_hex_bin(uint32_t hex_chars4) {
 	word_t hex_data = 0;
 	for (int i = 0; i < 4; i++) {
 		char c = (hex_chars4 >> i*8) & 0xFF;
@@ -422,45 +563,115 @@ word_t make_hex_bin(uint32_t hex_chars4) {
 	return hex_data;
 }
 
-static word_t make_hex_chars(word_t hex_data, char hex_chars[5]) {
-	#pragma HLS INTERFACE ap_memory port=hex_chars storage_type=ram_t2p
+void convert_uart_to_command(
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<word_t>& command_in
+) {
+	#pragma HLS INTERFACE axis port=uart_in depth=32
+	#pragma HLS INTERFACE axis port=command_in depth=32
+
+	static word_t read_data[16];
+	#pragma HLS BIND_STORAGE variable=read_data type=RAM_T2P impl=BRAM
+
+	bool key_input = false;
+	word_t key_code = 0;
+	static bool key_requested = false;
+
+	debug_phase_t1_ = 0xB0;
+	//if (!uart_in.empty()) {
+		token_word_t token = uart_in.read();
+		if ((token & 0xFF) == 'K') {
+			debug_phase_t1_ = 0xB1;
+			key_input = true;
+			key_code = (((token >> 8)&0xFF)-'0')*100+(((token >> 16)&0xFF)-'0')*10+(((token >> 24)&0xFF)-'0'); // ToDo: conversion is not general
+		}
+
+		if (key_input) {
+			debug_phase_t1_ = 0xB2;
+			command_in.write(WRITE_TO_DRAM);
+			command_in.write(0x6000);
+			command_in.write(key_code);
+			command_in.write(NORMAL_OPERATION);
+		} else {
+			word_t command = make_hex_bin(token);
+			debug_command_ = command;
+			command_in.write(command);
+		}
+	//}
+}
+
+void uart_in_task(
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<word_t>& command_in
+) {
+	#pragma HLS INTERFACE axis port=uart_in depth=32
+	#pragma HLS INTERFACE axis port=command_in depth=32
+
+	convert_uart_to_command(uart_in, command_in);
+}
+
+void comp_task(
+	hls::stream<word_t>& command_in,
+	hls::stream<word_t>& command_out
+) {
+	#pragma HLS INTERFACE axis port=command_in depth=32
+	#pragma HLS INTERFACE axis port=command_out depth=32
+
+	cpu_wrapper(command_in, command_out);
+}
+
+static int make_hex_chars(
+	word_t hex_data,
+	hls::stream<char>& uart_out
+) {
+	#pragma HLS INTERFACE axis port=uart_out depth=128
+
 	for (int i = 0; i < 4; i++) {
 		char temp = ((hex_data >> (3 - i) * 4) & 0xF);
-		hex_chars[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
+		char hex_char = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
+		uart_out.write(hex_char);
 	}
-	hex_chars[4] = '\n';
+	uart_out.write('\n');
 	//hex_chars[5] = '\0';
 	return 5;
 }
 
-static word_t make_disp_out(word_t addrM, word_t dataM, char out[10]) {
-	#pragma HLS INTERFACE ap_memory port=out storage_type=ram_t2p
+static int make_disp_out(
+	word_t addrM,
+	word_t dataM,
+	hls::stream<char>& uart_out
+) {
+	#pragma HLS INTERFACE axis port=uart_out depth=128
+
 	static word_t last_data_ = 0;
 	if (addrM >= 0x4000) {
 		unsigned short addr = addrM - 0x4000;
 #if 1
 		if (dataM == last_data_) {
-			out[0] = '%';
+			uart_out.write('%');
 			for (int i = 1; i <= 4; i++) {
 				char temp = ((addr >> (4 - i) * 4) & 0xF);
-				out[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+				char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+				uart_out.write(out);
 			}
-			out[5] = '\n';
+			uart_out.write('\n');
 			//out[6] = '\0';
 			return 6;
 		} else
 #endif
 		{
-			out[0] = '!';
+			uart_out.write('!');
 			for (int i = 1; i <= 4; i++) {
 				char temp = ((addr >> (4 - i) * 4) & 0xF);
-				out[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+				char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+				uart_out.write(out);
 			}
 			for (int i = 5; i <= 8; i++) {
 				char temp = ((dataM >> (8 - i) * 4) & 0xF);
-				out[i] = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+				char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+				uart_out.write(out);
 			}
-			out[9] = '\n';
+			uart_out.write('\n');
 			//out[10] = '\0';
 			last_data_ = dataM;
 			return 10;
@@ -469,119 +680,71 @@ static word_t make_disp_out(word_t addrM, word_t dataM, char out[10]) {
 	return 0;
 }
 
-void cpu_wrapper2(word_t command, bool command_execute,
-		word_t read_data[16], word_t& num_ret, word_t& ret_status,
-		word_t disp_out[2], bool auto_continue, bool key_input, word_t key_code) {
-	#pragma HLS INTERFACE ap_memory port=read_data storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=disp_out storage_type=ram_t2p
+static int make_key_request(
+	hls::stream<char>& uart_out
+) {
+	#pragma HLS INTERFACE axis port=uart_out depth=128
 
-	// CPU interface signals
-    static hls::stream<word_t> command_in;
-    static hls::stream<word_t> command_out;
-
-    num_ret = 0;
-	if (key_input) {
-		command_in.write(WRITE_TO_DRAM);
-		command_in.write(0x6000);
-		command_in.write(key_code);
-		cpu_wrapper(command_in, command_out);
-		DUMMY_READ();
-	}
-	if (command_execute) {
-		if (auto_continue) {
-			// auto continue
-			command_in.write(NORMAL_OPERATION);
-		}
-		// 実行
-		cpu_wrapper(command_in, command_out);
-		while (command_out.empty()) {}
-		num_ret = command_out.read();
-		for (int i = 0; i < num_ret; i++) {
-			read_data[i] = command_out.read();
-		}
-		ret_status = command_out.read();
-		if (ret_status == BREAK_REASON_DISP) {
-			disp_out[0] = command_out.read();
-			disp_out[1] = command_out.read();
-		}
-	} else {
-		//sprintf(buf, "snd: %04x", send_data);
-		//std::cout << buf << std::endl;
-		command_in.write(command);
-	}
+	uart_out.write('?');
+	uart_out.write('\n');
+	return 2;
 }
 
-void uart_bridge(
-		const uint32_t char_in4,
-		volatile char& auto_continue_requested,
-		char char_out[OUT_CHAR_SIZE],
-		word_t& num_char_out,
-		word_t& num_disp_out,
-		volatile char& key_requested,
-		volatile word_t& debug_command_,
-		volatile char& debug_phase_) {
+void convert_out_to_uart(
+	hls::stream<word_t>& command_out,
+	hls::stream<char>& uart_out
+) {
+	#pragma HLS INTERFACE axis port=command_out depth=32
+	#pragma HLS INTERFACE axis port=uart_out depth=128
 
-	bool command_execute = false;
-	word_t read_data[16];
-	#pragma HLS BIND_STORAGE variable=read_data type=RAM_T2P impl=BRAM
+	//if (!command_out.empty()) {
+		debug_phase_t3_ = 0xD0;
 
-	word_t num_ret = 0;
-	word_t ret_status = 0;
-	static word_t disp_out[2];
-	#pragma HLS BIND_STORAGE variable=disp_out type=RAM_T2P impl=BRAM
+		word_t num_ret = command_out.read();
+		if (num_ret != 0xFFFF) {
+			make_hex_chars(num_ret, uart_out);
 
-	bool auto_continue = false;
-	bool key_input = false;
-	word_t key_code = 0;
+			debug_phase_t3_ = 0xD2;
+			for (int i = 0; i < num_ret; i++) {
+				word_t data = command_out.read();
+				make_hex_chars(data, uart_out);
+			}
 
-	num_char_out = 0;
-	num_disp_out = 0;
-	auto_continue_requested = false;
-	key_requested = false;
+			debug_phase_t3_ = 0xD3;
+			word_t ret_status = command_out.read();
+			make_hex_chars(ret_status, uart_out);
 
-	debug_phase_ = 0xB0;
-	if ((char_in4 & 0xFF) == 'K') {
-		debug_phase_ = 0xB1;
-		key_input = true;
-		command_execute = true;
-		auto_continue = true;
-		key_code = (((char_in4 >> 8)&0xFF)-'0')*100+(((char_in4 >> 16)&0xFF)-'0')*10+(((char_in4 >> 24)&0xFF)-'0');
-	}
-	else if ((char_in4 & 0xFF) == 'N') {
-		debug_phase_ = 0xB2;
-		command_execute = true;
-		auto_continue = true;
-	} else if ((char_in4 & 0xFF) == 'Z') {
-		debug_phase_ = 0xB3;
-		command_execute = true;
-	}
-	word_t command = make_hex_bin(char_in4);
-	debug_command_ = command;
-	cpu_wrapper2(command, command_execute, read_data, num_ret, ret_status,
-			disp_out, auto_continue, key_input, key_code);
-	debug_phase_ = 0xB4;
-	if (ret_status == BREAK_REASON_DISP) {
-		debug_phase_ = 0xB5;
-		num_disp_out = make_disp_out(disp_out[0], disp_out[1], &char_out[0]);
-		auto_continue_requested = true;
-	} else if (ret_status == BREAK_REASON_KEYIN) {
-		debug_phase_ = 0xB6;
-		key_requested = true;
-	} else if (command_execute) {
-		debug_phase_ = 0xB7;
-		num_char_out += make_hex_chars(num_ret, &char_out[0]);
-		for (int i = 0; i < num_ret; i++) {
-			num_char_out += make_hex_chars(read_data[i], &char_out[(i+1)*5]);
+			if (ret_status == BREAK_REASON_KEYIN) {
+				debug_phase_t3_ = 0xDE;
+				make_key_request(uart_out);
+			}
 		}
-		num_char_out += make_hex_chars(ret_status, &char_out[(num_ret+1)*5]);
-	}
+		else /*if (ret_status == BREAK_REASON_DISP)*/ {
+			debug_phase_t3_ = 0xDD;
+			word_t addrM = command_out.read();
+			word_t dataM = command_out.read();
+			make_disp_out(addrM, dataM, uart_out);
+		}
+	//}
 }
 
-static bool initialized = false;
-static int phase = -1;
+void uart_out_task(
+	hls::stream<word_t>& command_out,
+	hls::stream<char>& uart_out
+) {
+	#pragma HLS INTERFACE axis port=command_out depth=32
+	#pragma HLS INTERFACE axis port=uart_out depth=128
+
+	convert_out_to_uart(command_out, uart_out);
+}
+
+#ifndef __SYNTHESIS__
+#define USE_COM "COM2"
+uart_comm uart_comm("\\\\.\\" USE_COM);  // COM2ポートを開く
+#endif
 
 static void send_char(volatile unsigned int *uart_reg, const char c) {
-	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
 
 	// TXFIFOが満杯でないか確認
 	while ((uart_reg[STAT_REG_OFFSET] & 0x00000008)) {};
@@ -589,263 +752,99 @@ static void send_char(volatile unsigned int *uart_reg, const char c) {
 	uart_reg[TX_FIFO_OFFSET] = c;
 }
 
-static bool send_str(volatile unsigned int *uart_reg, const char s[TOKEN_SIZE], int& p, int length) {
-	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
-	#pragma HLS INTERFACE ap_memory port=s storage_type=ram_t2p
+static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+	#pragma HLS INTERFACE axis port=uart_out depth=128
 
-	if ((s[p] != 0) && (p < length)) {
-		send_char(uart_reg, s[p]);
-		p++;
+#ifndef __SYNTHESIS__
+	char uo[128];
+	DWORD length = 0;
+	for (int i = 0; i < sizeof(uo); i++) {
+		if (uart_out.empty()) break;
+		uo[i] = uart_out.read();
+		length++;
 	}
-	if (p == length) {
-		p = 0;
-		return true;
+	if (length) {
+		uart_comm.write_data(uo, length);
+	}
+#else
+	while (!uart_out.empty()) {
+		send_char(uart_reg, uart_out.read());
+	}
+#endif
+}
+
+static bool get_token(
+	    volatile unsigned int *uart_reg,
+		hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in
+) {
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+	#pragma HLS INTERFACE axis port=uart_in depth=32
+
+	static int char_index = 0;
+	static ap_uint<8*TOKEN_SIZE> token = 0;
+	static bool key_in_flag = false;
+
+#ifndef __SYNTHESIS__
+    char read_buf[1];
+    DWORD bytes_read = 0;
+	while ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
+						(bytes_read == sizeof(read_buf))) {
+		debug_rx_data_ = read_buf[0];
+#else
+	if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
+		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+#endif
+		token |= (debug_rx_data_ << 8*char_index);
+		char_index++;
+		if (char_index == TOKEN_SIZE) {
+			uart_in.write(token);
+			char_index = 0;
+			token = 0;
+			return true;
+		}
 	}
 	return false;
 }
 
-static bool get_token(
-		const ap_uint<1>& interrupt,
-	    volatile unsigned int *uart_reg,
-		volatile char& debug_rx_data_,
-		volatile char& debug_phase_,
-		volatile char& rx0,
-		volatile char& rx1,
-		volatile char& rx2,
-		volatile char& rx3) {
-	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
-
-	while (1) {
-		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
-			debug_phase_ = 0xC0;
-			rx0 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-			break;
-		}
-	}
-
-	while (1) {
-		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
-			debug_phase_ = 0xC1;
-			rx1 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-			break;
-		}
-	}
-
-	while (1) {
-		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
-			debug_phase_ = 0xC2;
-			rx2 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-			break;
-		}
-	}
-
-	while (1) {
-		if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
-			debug_phase_ = 0xC3;
-			rx3 = debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-			break;
-		}
-	}
-
-	return true;
-}
-
-static void process_output(
-		volatile unsigned int *uart_reg,
-		word_t& num_disp_out,
-		word_t& num_char_out,
-		int out_p,
-		char char_out[OUT_CHAR_SIZE],
-		volatile char& num_disp_out_,
-		volatile char& num_char_out_,
-		char char_out_[OUT_CHAR_SIZE],
-		volatile char& debug_phase_,
-		volatile char& debug_rx_data_) {
-	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
-	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
-
-	if (num_disp_out) {
-		// display out
-		debug_phase_ = phase = 0xE3;
-		while (send_str(uart_reg, char_out, out_p, num_disp_out)) {}
-		num_disp_out_ = num_disp_out;
-		num_disp_out = 0; // 1文字ずつ出して出し切った
-		memcpy(char_out_, char_out, num_disp_out_);
-	} else if (num_char_out) {
-		// command completed
-		debug_phase_ = phase = 0xE2;
-		while (send_str(uart_reg, char_out, out_p, num_char_out)) {}
-		num_char_out_ = num_char_out;
-		num_char_out = 0; // 1文字ずつ出して出し切った
-		memcpy(char_out_, char_out, num_char_out_);
-	}
-}
-
-static void execute_command(
-		uint32_t command_in4,
-		volatile char& auto_continue_requested_,
-		volatile char& key_requested,
-		volatile unsigned int *uart_reg,
-		word_t& num_disp_out,
-		word_t& num_char_out,
-		int out_p,
-		char char_out[OUT_CHAR_SIZE],
-		volatile char& num_disp_out_,
-		volatile char& num_char_out_,
-		char char_out_[OUT_CHAR_SIZE],
-		volatile char& debug_phase_,
-		volatile word_t& debug_command_,
-		volatile char& debug_rx_data_) {
-	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
-	#pragma HLS INTERFACE ap_memory port=char_out storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
-
-	// コマンド実行
-	debug_phase_ = 0xE0;
-	uart_bridge(command_in4, auto_continue_requested_,
-			char_out, num_char_out, num_disp_out, key_requested,
-			debug_command_, debug_phase_);
-	debug_phase_ = 0xE1;
-	process_output(uart_reg,
-			num_disp_out, num_char_out, out_p, char_out,
-			num_disp_out_, num_char_out_, char_out_,
-			debug_phase_, debug_rx_data_);
-}
-
-static void uart_execute(
-		const ap_uint<1>& interrupt,
-		volatile unsigned int *uart_reg,
-		volatile char& auto_continue_requested_,
-		volatile char& keyin_requested_,
-		volatile char& num_disp_out_,
-		volatile char& num_char_out_,
-		char char_out_[OUT_CHAR_SIZE],
-		volatile char& commandin_available_,
-		const char commandin_[TOKEN_SIZE],
-		volatile char& keyin_available_,
-		const char keyin_[TOKEN_SIZE],
-		volatile char& debug_phase_,
-		volatile char& ic0_,
-		volatile char& ic1_,
-		volatile char& ic2_,
-		volatile char& ic3_,
-		volatile word_t& debug_command_,
-		volatile char& debug_rx_data_) {
-	#pragma HLS INTERFACE m_axi port=uart_reg depth=32
-	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=commandin_ storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=keyin_ storage_type=ram_t2p
-
-	static char key_requested = false;
-    static char char_out[OUT_CHAR_SIZE];
-	#pragma HLS BIND_STORAGE variable=char_out type=RAM_T2P impl=BRAM
-
-    static word_t num_char_out = 0;
-    static word_t num_disp_out = 0;
-    static const char no_keyin[TOKEN_SIZE] = {'K','0','0','0'};
-
-    static int out_p = 0;
-    static int key_in_count = 0;
-    num_disp_out_ = 0;
-    num_char_out_ = 0;
-
-	if (key_requested) {
-	    // Key 入力
-		if (keyin_available_) {
-			debug_phase_ = phase = 0xD1;
-			uint32_t key_in4 = (keyin_[3] << 24) + (keyin_[2] << 16) + (keyin_[1] << 8) + keyin_[0];
-			execute_command(key_in4, auto_continue_requested_, key_requested,
-					uart_reg, num_disp_out, num_char_out, out_p,
-					char_out, num_disp_out_, num_char_out_, char_out_,
-					debug_phase_, debug_command_, debug_rx_data_);
-			keyin_available_ = false; /* consumed */
-		} else if (get_token(interrupt, uart_reg, debug_rx_data_, debug_phase_, ic0_, ic1_, ic2_, ic3_)) {
-			debug_phase_ = phase = 0xD2;
-			uint32_t key_in4 = (ic3_ << 24) + (ic2_ << 16) + (ic1_ << 8) + ic0_;
-			execute_command(key_in4, auto_continue_requested_, key_requested,
-					uart_reg, num_disp_out, num_char_out, out_p,
-					char_out, num_disp_out_, num_char_out_, char_out_,
-					debug_phase_, debug_command_, debug_rx_data_);
-		}
-	} else {
-		if (commandin_available_) {
-			uint32_t command_in4 = (commandin_[3] << 24) + (commandin_[2] << 16) + (commandin_[1] << 8) + commandin_[0];
-			execute_command(command_in4, auto_continue_requested_, key_requested,
-					uart_reg, num_disp_out, num_char_out, out_p,
-					char_out, num_disp_out_, num_char_out_, char_out_,
-					debug_phase_, debug_command_, debug_rx_data_);
-			commandin_available_ = false; /* consumed */
-		} else if (get_token(interrupt, uart_reg, debug_rx_data_, debug_phase_, ic0_, ic1_, ic2_, ic3_)) {
-			uint32_t command_in4 = (ic3_ << 24) + (ic2_ << 16) + (ic1_ << 8) + ic0_;
-			execute_command(command_in4, auto_continue_requested_, key_requested,
-					uart_reg, num_disp_out, num_char_out, out_p,
-					char_out, num_disp_out_, num_char_out_, char_out_,
-					debug_phase_, debug_command_, debug_rx_data_);
-		}
-	}
-	keyin_requested_ = key_requested;
-}
+static bool initialized = false;
+//static int phase = -1;
 
 void uart_if(
 	bool start,
-	const ap_uint<1>& interrupt,
 	volatile unsigned int *uart_reg,
-	volatile char& auto_continue_requested_,
-	volatile char& keyin_requested_,
-	volatile char& num_disp_out_,
-	volatile char& num_char_out_,
-	char char_out_[OUT_CHAR_SIZE],
-	volatile char& commandin_available_,
-	const char commandin_[TOKEN_SIZE],
-	volatile char& keyin_available_,
-	const char keyin_[TOKEN_SIZE],
-	volatile char& debug_phase_,
-	volatile char& debug_rx_data_,
-	volatile char& ic0_,
-	volatile char& ic1_,
-	volatile char& ic2_,
-	volatile char& ic3_,
-	volatile word_t& debug_command_,
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<char>& uart_out,
+	volatile char& debug_phase__,
+	volatile word_t& debug_command__,
+	volatile char& debug_rx_data__,
 	char debug_injection
 ) {
 	#pragma HLS INTERFACE ap_none port=start
-    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct bundle=AXIM depth=20 // depthを正しく設定しないとCo-simがうまくいかない
-	#pragma HLS INTERFACE ap_none port=debug_phase_
-	#pragma HLS INTERFACE ap_none port=debug_rx_data_
+    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
     #pragma HLS INTERFACE ap_none port=return
-	#pragma HLS INTERFACE ap_memory port=char_out_ storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=commandin_ storage_type=ram_t2p
-	#pragma HLS INTERFACE ap_memory port=keyin_ storage_type=ram_t2p
 
 	// ボーレート設定（例：115200 bps）
 	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します
 
-    debug_phase_ = phase = 0;
-	debug_rx_data_ = 0;
+    debug_phase__ = 0;
+	debug_rx_data__ = debug_rx_data_ = 0;
 	if (start && !initialized) {
-		debug_phase_ = phase = 2;
+		debug_phase__ = 2;
 		initialized = true;
 		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ソフトウェアリセット
 		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
 		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
 
-	} else if (start && debug_injection) {
-
-		// データをTXFIFOに書き込む
-		send_char(uart_reg, debug_injection);
-		debug_phase_ = phase = 10;
-		// RXFIFOからデータを読み取る
-		while((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 0) {}
-		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-
 	} else if (start) {
-		debug_phase_ = phase = 6;
-		uart_execute(interrupt, uart_reg, auto_continue_requested_, keyin_requested_,
-				num_disp_out_, num_char_out_, char_out_,
-				commandin_available_, commandin_,
-				keyin_available_, keyin_,
-				debug_phase_, ic0_, ic1_, ic2_, ic3_,
-				debug_command_, debug_rx_data_);
+		//#pragma HLS DATAFLOW
+
+		//while (1) {
+			debug_phase__ = 6;
+
+			get_token(uart_reg, uart_in);
+			debug_phase__ = 10;
+			send_chars(uart_reg, uart_out);
+		//}
     }
 }
