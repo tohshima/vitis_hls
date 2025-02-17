@@ -28,7 +28,7 @@ uart_comm::uart_comm(const char* portName) {
         return;
     }
 
-    dcbSerialParams.BaudRate = CBR_115200;
+    dcbSerialParams.BaudRate = CBR_256000; //CBR_115200;
     dcbSerialParams.ByteSize = 8;
     dcbSerialParams.StopBits = ONESTOPBIT;
     dcbSerialParams.Parity = NOPARITY;
