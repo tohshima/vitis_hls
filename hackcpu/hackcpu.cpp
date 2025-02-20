@@ -509,7 +509,7 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
 			default:
 				halt = 1;
 				SEND_NUM_RETVALS(0);
-				state = 0;
+				state = 2;
 				num_args = 0;
 				break;
 		}
@@ -816,9 +816,7 @@ void uart_if(
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
 	volatile char& debug_phase__,
-	volatile word_t& debug_command__,
-	volatile char& debug_rx_data__,
-	char debug_injection
+	volatile char& debug_rx_data__
 ) {
 	#pragma HLS INTERFACE ap_none port=start
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depth‚ğ³‚µ‚­İ’è‚µ‚È‚¢‚ÆCo-sim‚ª‚¤‚Ü‚­‚¢‚©‚È‚¢

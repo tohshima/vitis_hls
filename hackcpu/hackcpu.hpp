@@ -119,9 +119,7 @@ void uart_if(
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
 	volatile char& debug_phase__,
-	volatile word_t& debug_command__,
-	volatile char& debug_rx_data__,
-	char debug_injection
+	volatile char& debug_rx_data__
 );
 void uart_in_task(
 	hls::stream<token_word_t>& uart_in,

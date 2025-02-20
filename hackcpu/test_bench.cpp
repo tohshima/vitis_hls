@@ -272,9 +272,9 @@ int main() {
 	hls_thread_local hls::task t2(comp_task, command_in, command_out);
 	hls_thread_local hls::task t3(uart_out_task, command_out, uart_out);
 
-	uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_command__, debug_rx_data__, debug_injection);
+	uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_rx_data__);
 	while(1) {
-		uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_command__, debug_rx_data__, debug_injection);
+		uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_rx_data__);
 		debug_phase__ = 7;
 		//uart_in_task(uart_in, command_in);
 		debug_phase__ = 8;
