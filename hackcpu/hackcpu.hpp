@@ -4,10 +4,12 @@
 #include <ap_axi_sdata.h>
 
 // A-instruction fall through mode (can be dual issue with the next instruction)
-#define AINST_DUAL_ISSUE
+//#define AINST_DUAL_ISSUE
 
-//#define PIPELINE_II_1
-//#define REDUCE_CINST_CYCLE
+#ifndef AINST_DUAL_ISSUE
+#define PIPELINE_II_1
+//#define REDUCE_CINST_CYCLE // not work
+#endif
 
 // Define bit widths
 const int WORD_WIDTH = 16;
@@ -127,9 +129,13 @@ void uart_in_task(
 );
 void comp_task(
 	hls::stream<word_t>& command_in,
-	hls::stream<word_t>& command_out
+	hls::stream<word_t>& command_out,
+	hls::stream<word_t>& dispadr_out,
+	hls::stream<word_t>& dispdat_out
 );
 void uart_out_task(
 	hls::stream<word_t>& command_out,
+	hls::stream<word_t>& dispadr_out,
+	hls::stream<word_t>& dispdat_out,
 	hls::stream<char>& uart_out
 );

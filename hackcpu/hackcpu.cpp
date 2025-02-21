@@ -110,11 +110,13 @@ static word_t next_inst;
 static ap_uint<1> cinst_phase = 0;
 static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
-static word_t break_condition_bitmap = BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN;
+static word_t break_condition_bitmap = /*BREAK_CONDITION_BIT_DISPOUT |*/ BREAK_CONDITION_BIT_KEYIN;
 static uint64_t break_cycle_interval = 0;
 
-static void disp_out_or_key_in_check(ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap,
-		bool mem_access, word_t& break_reason) {
+static void disp_out_or_key_in_check(
+	ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap,
+	bool mem_access, word_t& break_reason
+) {
 	if (break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) {
 		if (write_out && (addressM >= 0x4000)) {
 			break_reason = BREAK_REASON_DISP;
@@ -130,12 +132,18 @@ static void disp_out_or_key_in_check(ap_uint<1> write_out, addr_t addressM, word
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
 //       Separate M load 
-static word_t cpu(word_t i_ram[IRAM_SIZE],
-         word_t d_ram[DRAM_SIZE],
-         ap_uint<1>& reset) {
+word_t cpu(
+	word_t i_ram[IRAM_SIZE],
+	word_t d_ram[DRAM_SIZE],
+	ap_uint<1>& reset,
+    hls::stream<word_t>& dispadr_packet_out,
+    hls::stream<word_t>& dispdat_packet_out
+) {
 #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
 #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
 #pragma HLS INTERFACE ap_none port=reset
+#pragma HLS INTERFACE axis port=dispadr_packet_out depth=128
+#pragma HLS INTERFACE axis port=dispdat_packet_out depth=128
 
 	word_t break_reason = BREAK_REASON_CYCLE;
     if (reset) {
@@ -184,7 +192,7 @@ static word_t cpu(word_t i_ram[IRAM_SIZE],
 #if defined(PIPELINE_II_1) && defined(REDUCE_CINST_CYCLE)
                 if ((cinst_phase == 0) && (instruction[12] == 0) && (instruction[3] == 0))
                 {
-                    // No memomory access case for both of source and detination, it can go through cinst_phase 1.
+                    // No memory access case for both of source and destination, it can go through cinst_phase 1.
                     comp(instruction, Regs.A, Regs.D, alu_out);
                     cinst_phase = 1;
                 }
@@ -214,6 +222,10 @@ static word_t cpu(word_t i_ram[IRAM_SIZE],
                         Regs.A, Regs.D, d_ram, write_out, outM, addressM);
                     disp_out_or_key_in_check(write_out, addressM, break_condition_bitmap,
                     		instruction[12], break_reason);
+                    if (write_out && (addressM >= 0x4000)) {
+            			dispadr_packet_out.write(addressM);
+            			dispdat_packet_out.write(outM);
+                    }
 
                     // Jump condition
                     jump = get_jump_condition(alu_out, instruction);
@@ -236,6 +248,7 @@ static word_t cpu(word_t i_ram[IRAM_SIZE],
 }
 
 #define SEND_NUM_RETVALS(num) {command_packet_out.write(num);}
+#define SEND_STATUS(sta) {command_packet_out.write(sta);}
 
 static word_t bit_count(word_t bitmap) {
 	word_t count = 0;
@@ -245,57 +258,48 @@ static word_t bit_count(word_t bitmap) {
 	return count;
 }
 
-void cpu_wrapper(hls::stream<word_t>& command_packet_in,
-                 hls::stream<word_t>& command_packet_out) {
-                    
+void cpu_wrapper(
+	hls::stream<word_t>& command_packet_in,
+    hls::stream<word_t>& command_packet_out,
+    hls::stream<word_t>& dispadr_packet_out,
+    hls::stream<word_t>& dispdat_packet_out
+) {
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
+	#pragma HLS INTERFACE axis port=dispadr_packet_out depth=128
+	#pragma HLS INTERFACE axis port=dispdat_packet_out depth=128
     //#pragma HLS INTERFACE ap_fifo port=debug 
 
-    // Internal ROM
-    static word_t i_ram[IRAM_SIZE];
-    #pragma HLS BIND_STORAGE variable=i_ram type=RAM_2P impl=BRAM
+	#pragma HLS INTERFACE axis port=command_packet_in depth=32
+	#pragma HLS INTERFACE axis port=command_packet_out depth=32
+	//#pragma HLS INTERFACE ap_fifo port=debug
 
-    // Internal RAM
-    static word_t d_ram[DRAM_SIZE];
-    #pragma HLS BIND_STORAGE variable=d_ram type=RAM_T2P impl=BRAM
+	// Internal ROM
+	static word_t i_ram[IRAM_SIZE];
+	#pragma HLS BIND_STORAGE variable=i_ram type=RAM_2P impl=BRAM
 
-    static ap_uint<1> reset = 1;
-    static ap_uint<1> halt = 1;
+	// Internal RAM
+	static word_t d_ram[DRAM_SIZE];
+	#pragma HLS BIND_STORAGE variable=d_ram type=RAM_T2P impl=BRAM
 
-    static int state = -1; // -1: wait for command receive 0: command received, 1: wait for args receive, 2: arg received
-    static int num_args = 0;
-    static control_command_e curr_commmand = NO_OPERATION;
+	static ap_uint<1> reset = 1;
+	static ap_uint<1> halt = 1;
 
-	if (state == -1) {
-		//if (!command_packet_in.empty()) {
-			curr_commmand = (control_command_e)command_packet_in.read().to_int();
-			state = 0;
-		//}
-	}
-	if ((state == 0) || (state == 1)) {
-		switch(curr_commmand) {
+	//while (!command_packet_in.empty()) {
+		// feed a new command
+		control_command_e command = (control_command_e)command_packet_in.read().to_int();
+		switch(command) {
 			case NORMAL_OPERATION:
 				cycle_to_stop =  (break_cycle_interval > 0)? cycle+break_cycle_interval:  0xFFFFFFFFFFFFFFFFull;
 				halt = 0;
-				//SEND_NUM_RETVALS(0);
-				state = 2;
 				break;
 			case SET_RESET_CONFIG:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 1;
-				}
-				if (state == 1) {
-					if (num_args /*&& !command_packet_in.empty()*/) {
-						word_t bitmap = command_packet_in.read();
-						reset = (bitmap & RESET_BIT_RESET)? 1: 0;
-						halt = (bitmap & RESET_BIT_HALT)? 1: 0;
-						SEND_NUM_RETVALS(0);
-						state = 2;
-					}
-				}
+				while(command_packet_in.empty()) {}
+				word_t bitmap = command_packet_in.read();
+				reset = (bitmap & RESET_BIT_RESET)? 1: 0;
+				halt = (bitmap & RESET_BIT_HALT)? 1: 0;
+				SEND_NUM_RETVALS(0);
 				break;
 			}
 			case GET_RESET_CONFIG:
@@ -304,118 +308,57 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
 				if (reset) bitmap |= RESET_BIT_RESET;
 				if (halt) bitmap |= RESET_BIT_HALT;
 				SEND_NUM_RETVALS(1);
-				state = 2;
 				command_packet_out.write(bitmap);
 				break;
 			}
 			case WRITE_TO_IRAM:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 2;
-				}
-				if (state == 1) {
-					static addr_t w2i_address;
-					while (num_args /*&& !command_packet_in.empty()*/) {
-						if (num_args == 2) {
-							w2i_address = (addr_t)command_packet_in.read();
-						} else if (num_args == 1) {
-							word_t data = command_packet_in.read();
-							i_ram[w2i_address] = data;
-							SEND_NUM_RETVALS(0);
-							state = 2;
-						}
-						num_args--;
-					}
-				}
+				while(command_packet_in.empty()) {}
+				addr_t address = (addr_t)command_packet_in.read();
+				while(command_packet_in.empty()) {}
+				word_t data = command_packet_in.read();
+				i_ram[address] = data;
+				SEND_NUM_RETVALS(0);
 				break;
 			}
 			case LOAD_TO_IRAM:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 2;
+				while(command_packet_in.empty()) {}
+				addr_t address = (addr_t)command_packet_in.read();
+				while(command_packet_in.empty()) {}
+				word_t length = command_packet_in.read();
+				for (word_t i = 0; i < length; i++) {
+					while(command_packet_in.empty()) {}
+					word_t data = command_packet_in.read();
+					i_ram[address+i] = data;
 				}
-				if (state == 1) {
-					static addr_t l2i_address = 0;
-					static word_t l2i_length = 0;
-					static bool l2i_got_length = false;
-					while (num_args /*&& !command_packet_in.empty()*/) {
-						if (!l2i_got_length) {
-							if (num_args == 2) {
-								l2i_address = (addr_t)command_packet_in.read();
-							} else if (num_args == 1) {
-								l2i_length = command_packet_in.read();
-								num_args = l2i_length;
-								l2i_got_length = true;
-								continue;
-							}
-						} else {
-							word_t data = command_packet_in.read();
-							i_ram[l2i_address+l2i_length-num_args] = data;
-						}
-						num_args--;
-					}
-					if (num_args == 0) {
-						SEND_NUM_RETVALS(0);
-						l2i_got_length = false;
-						state = 2;
-					}
-				}
+				SEND_NUM_RETVALS(0);
 				break;
 			}
 			case READ_FROM_IRAM:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 1;
-				}
-				if (state == 1) {
-					if (num_args /*&& !command_packet_in.empty()*/) {
-						addr_t rfi_address = (addr_t)command_packet_in.read();
-						SEND_NUM_RETVALS(1);
-						command_packet_out.write(i_ram[rfi_address]);
-						state = 2;
-					}
-				}
+				while(command_packet_in.empty()) {}
+				addr_t address = (addr_t)command_packet_in.read();
+				SEND_NUM_RETVALS(1);
+				command_packet_out.write(i_ram[address]);
 				break;
 			}
 			case WRITE_TO_DRAM:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 2;
-				}
-				if (state == 1) {
-					static addr_t w2d_address = 0;
-					while (num_args /*&& !command_packet_in.empty()*/) {
-						if (num_args == 2) {
-							w2d_address = (addr_t)command_packet_in.read();
-						} else if (num_args == 1) {
-							word_t data = command_packet_in.read();
-							d_ram[w2d_address] = data;
-							SEND_NUM_RETVALS(0);
-							state = 2;
-						}
-						num_args--;
-					}
-				}
+				while(command_packet_in.empty()) {}
+				addr_t address = (addr_t)command_packet_in.read();
+				while(command_packet_in.empty()) {}
+				word_t data = command_packet_in.read();
+				d_ram[address] = data;
+				SEND_NUM_RETVALS(0);
 				break;
 			}
 			case READ_FROM_DRAM:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 1;
-				}
-				if (state == 1) {
-					if (num_args /*&& !command_packet_in.empty()*/) {
-						addr_t rfd_address = (addr_t)command_packet_in.read();
-						SEND_NUM_RETVALS(1);
-						command_packet_out.write(d_ram[rfd_address]);
-						state = 2;
-					}
-				}
+				while(command_packet_in.empty()) {}
+				addr_t address = (addr_t)command_packet_in.read();
+				SEND_NUM_RETVALS(1);
+				command_packet_out.write(d_ram[address]);
 				break;
 			}
 			case STEP_EXECUTION:
@@ -423,121 +366,67 @@ void cpu_wrapper(hls::stream<word_t>& command_packet_in,
 				halt = 0;
 				break_cycle_interval = 0;
 				break_condition_bitmap &= ~BREAK_CONDITION_BIT_INTERVAL;
-				SEND_NUM_RETVALS(0);
-				state = 2;
 				break;
 			case SET_BREAK_CONDITION:
-			{
-				if (state == 0) {
-					state = 1;
-					num_args = 1;
+				while(command_packet_in.empty()) {}
+				break_condition_bitmap = command_packet_in.read();
+				if (break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) {
+					break_cycle_interval = command_packet_in.read().to_uint64();
 				}
-				if (state == 1) {
-					static bool got_bcb = false;
-					if (!got_bcb /*&& !command_packet_in.empty()*/) {
-						break_condition_bitmap = command_packet_in.read();
-						got_bcb = true;
-					}
-					if (break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) {
-						if (got_bcb /*&& !command_packet_in.empty()*/) {
-							break_cycle_interval = command_packet_in.read().to_uint64();
-							SEND_NUM_RETVALS(0);
-							got_bcb = false;
-							state = 2;
-						}
-					} else {
-						if (got_bcb) {
-							SEND_NUM_RETVALS(0);
-							got_bcb = false;
-							state = 2;
-						}
-					}
-				}
+				SEND_NUM_RETVALS(0);
 				break;
-			}
 			case MULTI_STEP_EXECUTION:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 1;
-				}
-				if (state == 1) {
-					if (num_args /*&& !command_packet_in.empty()*/) {
-						word_t steps = command_packet_in.read();
-						cycle_to_stop = cycle+steps;
-						halt = 0;
-						SEND_NUM_RETVALS(0);
-						state = 2;
-					}
-				}
+				while(command_packet_in.empty()) {}
+				word_t steps = command_packet_in.read();
+				cycle_to_stop = cycle+steps;
+				halt = 0;
+				SEND_NUM_RETVALS(0);
 				break;
 			}
 			case GET_DEBUG_INFO:
 			{
-				if (state == 0) {
-					state = 1;
-					num_args = 1;
-				}
-				if (state == 1) {
-					if (num_args /*&& !command_packet_in.empty()*/) {
-						word_t bitmap = command_packet_in.read();
-						word_t bitcnt = ((bitmap & DINFO_BIT_CYCLE) ? 3:0) + bit_count(bitmap);
-						SEND_NUM_RETVALS(bitcnt);
-						state = 2;
+				while(command_packet_in.empty()) {}
+				word_t bitmap = command_packet_in.read();
+				word_t bitcnt = ((bitmap & DINFO_BIT_CYCLE) ? 3:0) + bit_count(bitmap);
+				SEND_NUM_RETVALS(bitcnt);
 
-						if (bitmap & DINFO_BIT_CYCLE) {
-							command_packet_out.write(cycle & 0xFFFF);
-							command_packet_out.write((cycle >> 16) & 0xFFFF);
-							command_packet_out.write((cycle >> 32) & 0xFFFF);
-							command_packet_out.write((cycle >> 48) & 0xFFFF);
-						}
-						if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
-						if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
-						if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
-						if (bitmap & DINFO_BIT_PC) command_packet_out.write(pc_of_cycle_start);
-						if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
-						if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
-						if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
-						if (bitmap & DINFO_BIT_INST1) command_packet_out.write(first_inst);
-						if (bitmap & DINFO_BIT_INST2) command_packet_out.write(next_inst);
-						if (bitmap & DINFO_BIT_SP) command_packet_out.write(d_ram[0]);
-					}
+				if (bitmap & DINFO_BIT_CYCLE) {
+					command_packet_out.write(cycle & 0xFFFF);
+					command_packet_out.write((cycle >> 16) & 0xFFFF);
+					command_packet_out.write((cycle >> 32) & 0xFFFF);
+					command_packet_out.write((cycle >> 48) & 0xFFFF);
 				}
+				if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
+				if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
+				if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
+				if (bitmap & DINFO_BIT_PC) command_packet_out.write(pc_of_cycle_start);
+				if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
+				if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
+				if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
+				if (bitmap & DINFO_BIT_INST1) command_packet_out.write(first_inst);
+				if (bitmap & DINFO_BIT_INST2) command_packet_out.write(next_inst);
+				if (bitmap & DINFO_BIT_SP) command_packet_out.write(d_ram[0]);
 				break;
 			}
 
 			default:
 				halt = 1;
 				SEND_NUM_RETVALS(0);
-				state = 2;
-				num_args = 0;
 				break;
 		}
-	}
-	if (state == 2) {
 		word_t break_reason = BREAK_REASON_NOP;
 		if (reset || !halt) {
-			break_reason = cpu(i_ram, d_ram, reset);
+			break_reason = cpu(i_ram, d_ram, reset, dispadr_packet_out, dispdat_packet_out);
 			if ((break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) &&
 					(break_reason == BREAK_REASON_CYCLE)) {
 				break_reason = BREAK_REASON_INTERVAL;
 			}
+			if (!reset) SEND_NUM_RETVALS(0);
 			halt = 1;
 		}
-		if ((break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) && (break_reason == BREAK_REASON_DISP)) {
-			SEND_NUM_RETVALS(0xFFFF);
-			command_packet_out.write(addressM);
-			command_packet_out.write(outM);
-			curr_commmand = NORMAL_OPERATION;
-			state = 0; // re-execute NOMAL_OPERATION for next call without response to host
-		} else {
-			if (curr_commmand == NORMAL_OPERATION) {
-				SEND_NUM_RETVALS(0);
-			}
-			command_packet_out.write(break_reason);
-			state = -1;
-		}
-	}
+		SEND_STATUS(break_reason);
+	//}
 }
 
 
@@ -612,12 +501,16 @@ void uart_in_task(
 
 void comp_task(
 	hls::stream<word_t>& command_in,
-	hls::stream<word_t>& command_out
+	hls::stream<word_t>& command_out,
+	hls::stream<word_t>& dispadr_out,
+	hls::stream<word_t>& dispdat_out
 ) {
 	#pragma HLS INTERFACE axis port=command_in depth=32
 	#pragma HLS INTERFACE axis port=command_out depth=32
+	#pragma HLS INTERFACE axis port=dispadr_out depth=128
+	#pragma HLS INTERFACE axis port=dispdat_out depth=128
 
-	cpu_wrapper(command_in, command_out);
+	cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
 }
 
 static int make_hex_chars(
@@ -636,6 +529,18 @@ static int make_hex_chars(
 	return 5;
 }
 
+static void send_four_chars(
+	unsigned short data,
+	hls::stream<char>& uart_out
+) {
+	#pragma HLS INTERFACE axis port=uart_out depth=128
+
+	for (int i = 1; i <= 4; i++) {
+		char temp = ((data >> (4 - i) * 4) & 0xF);
+		char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
+		uart_out.write(out);
+	}
+}
 static int make_disp_out(
 	word_t addrM,
 	word_t dataM,
@@ -644,36 +549,39 @@ static int make_disp_out(
 	#pragma HLS INTERFACE axis port=uart_out depth=128
 
 	static word_t last_data_ = 0;
-	if (addrM >= 0x4000) {
-		unsigned short addr = addrM - 0x4000;
-#if 1
-		if (dataM == last_data_) {
+	static addr_t last_addr_ = 0;
+	unsigned short addr = addrM - 0x4000;
+	if (dataM == last_data_) {
+		if ((addr-last_addr_) == 1) {
+			// incremental address and the same data
+			uart_out.write('&');
+			uart_out.write('\n');
+			last_addr_ = addr;
+			return 2;
+		} else {
+			// the same data
 			uart_out.write('%');
-			for (int i = 1; i <= 4; i++) {
-				char temp = ((addr >> (4 - i) * 4) & 0xF);
-				char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
-				uart_out.write(out);
-			}
+			send_four_chars(addr, uart_out);
 			uart_out.write('\n');
-			//out[6] = '\0';
+			last_addr_ = addr;
 			return 6;
-		} else
-#endif
-		{
-			uart_out.write('!');
-			for (int i = 1; i <= 4; i++) {
-				char temp = ((addr >> (4 - i) * 4) & 0xF);
-				char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
-				uart_out.write(out);
-			}
-			for (int i = 5; i <= 8; i++) {
-				char temp = ((dataM >> (8 - i) * 4) & 0xF);
-				char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
-				uart_out.write(out);
-			}
+		}
+	} else {
+		if ((addr-last_addr_) == 1) {
+			// incremental address
+			uart_out.write('$');
+			send_four_chars(dataM, uart_out);
 			uart_out.write('\n');
-			//out[10] = '\0';
 			last_data_ = dataM;
+			last_addr_ = addr;
+			return 6;
+		} else {
+			uart_out.write('!');
+			send_four_chars(addr, uart_out);
+			send_four_chars(dataM, uart_out);
+			uart_out.write('\n');
+			last_data_ = dataM;
+			last_addr_ = addr;
 			return 10;
 		}
 	}
@@ -692,50 +600,55 @@ static int make_key_request(
 
 void convert_out_to_uart(
 	hls::stream<word_t>& command_out,
+	hls::stream<word_t>& dispadr_out,
+	hls::stream<word_t>& dispdat_out,
 	hls::stream<char>& uart_out
 ) {
 	#pragma HLS INTERFACE axis port=command_out depth=32
+	#pragma HLS INTERFACE axis port=dispadr_out depth=128
+	#pragma HLS INTERFACE axis port=dispdat_out depth=128
 	#pragma HLS INTERFACE axis port=uart_out depth=128
 
-	//if (!command_out.empty()) {
+	if (!command_out.empty()) {
 		debug_phase_t3_ = 0xD0;
 
 		word_t num_ret = command_out.read();
-		if (num_ret != 0xFFFF) {
-			make_hex_chars(num_ret, uart_out);
+		make_hex_chars(num_ret, uart_out);
 
-			debug_phase_t3_ = 0xD2;
-			for (int i = 0; i < num_ret; i++) {
-				word_t data = command_out.read();
-				make_hex_chars(data, uart_out);
-			}
-
-			debug_phase_t3_ = 0xD3;
-			word_t ret_status = command_out.read();
-			make_hex_chars(ret_status, uart_out);
-
-			if (ret_status == BREAK_REASON_KEYIN) {
-				debug_phase_t3_ = 0xDE;
-				make_key_request(uart_out);
-			}
+		debug_phase_t3_ = 0xD2;
+		for (int i = 0; i < num_ret; i++) {
+			word_t data = command_out.read();
+			make_hex_chars(data, uart_out);
 		}
-		else /*if (ret_status == BREAK_REASON_DISP)*/ {
-			debug_phase_t3_ = 0xDD;
-			word_t addrM = command_out.read();
-			word_t dataM = command_out.read();
-			make_disp_out(addrM, dataM, uart_out);
+
+		debug_phase_t3_ = 0xD3;
+		word_t ret_status = command_out.read();
+		make_hex_chars(ret_status, uart_out);
+
+		if (ret_status == BREAK_REASON_KEYIN) {
+			debug_phase_t3_ = 0xDE;
+			make_key_request(uart_out);
 		}
-	//}
+	} else if (!dispadr_out.empty()) {
+		debug_phase_t3_ = 0xDD;
+		word_t addrM = dispadr_out.read();
+		word_t dataM = dispdat_out.read();
+		make_disp_out(addrM, dataM, uart_out);
+	}
 }
 
 void uart_out_task(
 	hls::stream<word_t>& command_out,
+	hls::stream<word_t>& dispadr_out,
+	hls::stream<word_t>& dispdat_out,
 	hls::stream<char>& uart_out
 ) {
 	#pragma HLS INTERFACE axis port=command_out depth=32
+	#pragma HLS INTERFACE axis port=dispadr_out depth=128
+	#pragma HLS INTERFACE axis port=dispdat_out depth=128
 	#pragma HLS INTERFACE axis port=uart_out depth=128
 
-	convert_out_to_uart(command_out, uart_out);
+	convert_out_to_uart(command_out, dispadr_out, dispdat_out, uart_out);
 }
 
 #ifndef __SYNTHESIS__

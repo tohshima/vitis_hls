@@ -267,10 +267,12 @@ int main() {
 	// CPU interface signals
     static hls_thread_local hls::stream<word_t> command_in;
     static hls_thread_local hls::stream<word_t> command_out;
+    static hls_thread_local hls::stream<word_t> dispadr_out;
+    static hls_thread_local hls::stream<word_t> dispdat_out;
 
 	hls_thread_local hls::task t1(uart_in_task, uart_in, command_in);
-	hls_thread_local hls::task t2(comp_task, command_in, command_out);
-	hls_thread_local hls::task t3(uart_out_task, command_out, uart_out);
+	hls_thread_local hls::task t2(comp_task, command_in, command_out, dispadr_out, dispdat_out);
+	hls_thread_local hls::task t3(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out);
 
 	uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_rx_data__);
 	while(1) {
