@@ -5,7 +5,7 @@
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
       "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
-      "",
+      "-D__SYNTHESIS__",
       "-c",
       "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
     ],
