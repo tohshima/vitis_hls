@@ -2,9 +2,6 @@
 #include <hls_task.h>
 #include <hls_stream.h>
 #include "hackcpu.hpp"
-#ifndef __SYNTHESIS__
-#include "uart_comm.hpp"
-#endif
 
 static void comp_core(word_t instruction, word_t x, word_t y, word_t &alu_out) {
     switch (instruction(11, 6)) {
@@ -39,23 +36,54 @@ static void comp(word_t instruction,
     comp_core(instruction, x, y, alu_out);
 }
 
-static void compM(word_t instruction, word_t A, word_t D, word_t ram[IRAM_SIZE],
-                  word_t &alu_out) {
-#pragma HLS inline
+static void compM(
+    word_t instruction, 
+    word_t A, 
+    word_t D, 
+    word_t ram[IRAM_SIZE],
+    word_t &alu_out,
+    hls::stream<addr_t>& periheral_raddr_out,
+    hls::stream<word_t>& periheral_rdata_in
+) {
+	#pragma HLS INTERFACE axis port=periheral_raddr_out depth=4
+	#pragma HLS INTERFACE axis port=periheral_rdata_in depth=4
+    #pragma HLS inline
+    
     word_t x = D;
-    word_t y = ram[A];
-    comp_core(instruction, x, y, alu_out);
+    if (A >= PERIPHERAL_START_ADDR) {
+        // Input from peripheral modules, mainly used for a key input in the current design.
+        periheral_raddr_out.write(A);
+        word_t y = periheral_rdata_in.read();
+        comp_core(instruction, x, y, alu_out);
+    } else {
+        word_t y = ram[A];
+        comp_core(instruction, x, y, alu_out);
+    }
 }
 
-static void get_destination(word_t instruction, word_t alu_out,
-    word_t& A, word_t& D,
+static void get_destination(
+    word_t instruction, 
+    word_t alu_out,
+    word_t& A, 
+    word_t& D,
     word_t ram[DRAM_SIZE], 
-    ap_uint<1>& write_out, word_t& outM, addr_t addressM) {
+    ap_uint<1>& write_out, 
+    word_t& outM, 
+    addr_t addressM,
+    hls::stream<addr_t>& periheral_waddr_out,
+    hls::stream<word_t>& periheral_wdata_out
+) {
 #pragma HLS inline
     if (instruction[3]) {
-        ram[addressM] = alu_out;
-        write_out = 1;
         outM = alu_out;
+        if (addressM >= PERIPHERAL_START_ADDR) {
+            periheral_waddr_out.write(addressM);
+            periheral_wdata_out.write(outM);
+            write_out = 0;
+        } else {
+            ram[addressM] = outM;
+            write_out = 1;
+        }
     } else {
         write_out = 0;
     }
@@ -110,9 +138,10 @@ static word_t next_inst;
 static ap_uint<1> cinst_phase = 0;
 static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
-static word_t break_condition_bitmap = /*BREAK_CONDITION_BIT_DISPOUT |*/ BREAK_CONDITION_BIT_KEYIN;
+static word_t break_condition_bitmap = 0; // BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN; // obsolete
 static uint64_t break_cycle_interval = 0;
 
+#if 0
 static void disp_out_or_key_in_check(
 	ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap,
 	bool mem_access, word_t& break_reason
@@ -128,6 +157,7 @@ static void disp_out_or_key_in_check(
 		}
 	}
 }
+#endif 
 
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
@@ -136,14 +166,20 @@ word_t cpu(
 	word_t i_ram[IRAM_SIZE],
 	word_t d_ram[DRAM_SIZE],
 	ap_uint<1>& reset,
-    hls::stream<word_t>& dispadr_packet_out,
-    hls::stream<word_t>& dispdat_packet_out
+    hls::stream<word_t>& interrupt_in,
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    hls::stream<addr_t>& peripheral_waddr_out,
+    hls::stream<word_t>& peripheral_wdata_out
 ) {
-#pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
-#pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
-#pragma HLS INTERFACE ap_none port=reset
-#pragma HLS INTERFACE axis port=dispadr_packet_out depth=128
-#pragma HLS INTERFACE axis port=dispdat_packet_out depth=128
+    #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
+    #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
+    #pragma HLS INTERFACE ap_none port=reset
+	#pragma HLS INTERFACE axis port=interrupt_in depth=4
+	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=4
+	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=4
+	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=128
+	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=128
 
 	word_t break_reason = BREAK_REASON_CYCLE;
     if (reset) {
@@ -164,6 +200,13 @@ word_t cpu(
             //if (cycle == cycle_to_stop) break;
             pc_of_cycle_start = Regs.PC;
             write_out = 0;
+
+            // interrupt check
+            if (!interrupt_in.empty()) {
+                // currently intterupt is used only to break for debugging
+                interrupt_in.read();
+                break_reason = BREAK_REASON_EXT;
+            }
 
             // Fetch
             instruction = i_ram[Regs.PC];
@@ -202,13 +245,13 @@ word_t cpu(
 #endif
 #if defined(PIPELINE_II_1) && defined(REDUCE_CINST_CYCLE)
                     // ALU computation using M
-                    compM(instruction, Regs.A, Regs.D, d_ram, alu_out);
+                    compM(instruction, Regs.A, Regs.D, d_ram, alu_out, peripheral_raddr_out, peripheral_rdata_in);
 #else
                     // ALU computation using 
                     if (instruction[12] == 0) {
                         comp(instruction, Regs.A, Regs.D, alu_out);
                     } else {
-                        compM(instruction, Regs.A, Regs.D, d_ram, alu_out);
+                        compM(instruction, Regs.A, Regs.D, d_ram, alu_out, peripheral_raddr_out, peripheral_rdata_in);
                     }
 #endif
                     cinst_phase = 1;
@@ -219,13 +262,10 @@ word_t cpu(
                     // Destination
                     addressM = Regs.A;
                     get_destination(instruction, alu_out,
-                        Regs.A, Regs.D, d_ram, write_out, outM, addressM);
-                    disp_out_or_key_in_check(write_out, addressM, break_condition_bitmap,
-                    		instruction[12], break_reason);
-                    if (write_out && (addressM >= 0x4000)) {
-            			dispadr_packet_out.write(addressM);
-            			dispdat_packet_out.write(outM);
-                    }
+                        Regs.A, Regs.D, d_ram, write_out, outM, addressM,
+                        peripheral_waddr_out, peripheral_wdata_out);
+                    //disp_out_or_key_in_check(write_out, addressM, break_condition_bitmap,
+                    //		instruction[12], break_reason);
 
                     // Jump condition
                     jump = get_jump_condition(alu_out, instruction);
@@ -261,13 +301,19 @@ static word_t bit_count(word_t bitmap) {
 void cpu_wrapper(
 	hls::stream<word_t>& command_packet_in,
     hls::stream<word_t>& command_packet_out,
-    hls::stream<word_t>& dispadr_packet_out,
-    hls::stream<word_t>& dispdat_packet_out
+    hls::stream<word_t>& interrupt_in,
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    hls::stream<addr_t>& peripheral_waddr_out,
+    hls::stream<word_t>& peripheral_wdata_out
 ) {
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
-	#pragma HLS INTERFACE axis port=dispadr_packet_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_packet_out depth=128
+	#pragma HLS INTERFACE axis port=interrupt_in depth=4
+	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=4
+	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=4
+	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=128
+	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=128
     //#pragma HLS INTERFACE ap_fifo port=debug 
 
 	#pragma HLS INTERFACE axis port=command_packet_in depth=32
@@ -417,7 +463,7 @@ void cpu_wrapper(
 		}
 		word_t break_reason = BREAK_REASON_NOP;
 		if (reset || !halt) {
-			break_reason = cpu(i_ram, d_ram, reset, dispadr_packet_out, dispdat_packet_out);
+			break_reason = cpu(i_ram, d_ram, reset, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 			if ((break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) &&
 					(break_reason == BREAK_REASON_CYCLE)) {
 				break_reason = BREAK_REASON_INTERVAL;
@@ -430,340 +476,3 @@ void cpu_wrapper(
 }
 
 
-volatile char debug_phase_t1_ = 0;
-volatile char debug_phase_t2_ = 0;
-volatile char debug_phase_t3_ = 0;
-volatile char debug_rx_data_ = 0;
-volatile word_t debug_command_ = 0;
-
-static char convert2hex(char c) {
-	char h = 0;
-	if ((c >= '0') && (c <= '9')) { h = (c-'0'); }
-	else if ((c >= 'a') && (c <= 'f')) { h = (c-'a'+10); }
-	else if ((c >= 'A') && (c <= 'F')) { h = (c-'A'+10); }
-	return h;
-}
-static word_t make_hex_bin(uint32_t hex_chars4) {
-	word_t hex_data = 0;
-	for (int i = 0; i < 4; i++) {
-		char c = (hex_chars4 >> i*8) & 0xFF;
-		hex_data += convert2hex(c) << (3-i)*4;
-	}
-	return hex_data;
-}
-
-void convert_uart_to_command(
-	hls::stream<token_word_t>& uart_in,
-	hls::stream<word_t>& command_in
-) {
-	#pragma HLS INTERFACE axis port=uart_in depth=32
-	#pragma HLS INTERFACE axis port=command_in depth=32
-
-	static word_t read_data[16];
-	#pragma HLS BIND_STORAGE variable=read_data type=RAM_T2P impl=BRAM
-
-	bool key_input = false;
-	word_t key_code = 0;
-	static bool key_requested = false;
-
-	debug_phase_t1_ = 0xB0;
-	//if (!uart_in.empty()) {
-		token_word_t token = uart_in.read();
-		if ((token & 0xFF) == 'K') {
-			debug_phase_t1_ = 0xB1;
-			key_input = true;
-			key_code = (((token >> 8)&0xFF)-'0')*100+(((token >> 16)&0xFF)-'0')*10+(((token >> 24)&0xFF)-'0'); // ToDo: conversion is not general
-		}
-
-		if (key_input) {
-			debug_phase_t1_ = 0xB2;
-			command_in.write(WRITE_TO_DRAM);
-			command_in.write(0x6000);
-			command_in.write(key_code);
-			command_in.write(NORMAL_OPERATION);
-		} else {
-			word_t command = make_hex_bin(token);
-			debug_command_ = command;
-			command_in.write(command);
-		}
-	//}
-}
-
-void uart_in_task(
-	hls::stream<token_word_t>& uart_in,
-	hls::stream<word_t>& command_in
-) {
-	#pragma HLS INTERFACE axis port=uart_in depth=32
-	#pragma HLS INTERFACE axis port=command_in depth=32
-
-	convert_uart_to_command(uart_in, command_in);
-}
-
-void comp_task(
-	hls::stream<word_t>& command_in,
-	hls::stream<word_t>& command_out,
-	hls::stream<word_t>& dispadr_out,
-	hls::stream<word_t>& dispdat_out
-) {
-	#pragma HLS INTERFACE axis port=command_in depth=32
-	#pragma HLS INTERFACE axis port=command_out depth=32
-	#pragma HLS INTERFACE axis port=dispadr_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_out depth=128
-
-	cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
-}
-
-static int make_hex_chars(
-	word_t hex_data,
-	hls::stream<char>& uart_out
-) {
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-	for (int i = 0; i < 4; i++) {
-		char temp = ((hex_data >> (3 - i) * 4) & 0xF);
-		char hex_char = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
-		uart_out.write(hex_char);
-	}
-	uart_out.write('\n');
-	//hex_chars[5] = '\0';
-	return 5;
-}
-
-static void send_four_chars(
-	unsigned short data,
-	hls::stream<char>& uart_out
-) {
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-	for (int i = 1; i <= 4; i++) {
-		char temp = ((data >> (4 - i) * 4) & 0xF);
-		char out = (temp <= 9) ? temp + '0' : temp - 10 + 'A';
-		uart_out.write(out);
-	}
-}
-static int make_disp_out(
-	word_t addrM,
-	word_t dataM,
-	hls::stream<char>& uart_out
-) {
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-	static word_t last_data_ = 0;
-	static addr_t last_addr_ = 0;
-	unsigned short addr = addrM - 0x4000;
-	if (dataM == last_data_) {
-		if ((addr-last_addr_) == 1) {
-			// incremental address and the same data
-			uart_out.write('&');
-			uart_out.write('\n');
-			last_addr_ = addr;
-			return 2;
-		} else {
-			// the same data
-			uart_out.write('%');
-			send_four_chars(addr, uart_out);
-			uart_out.write('\n');
-			last_addr_ = addr;
-			return 6;
-		}
-	} else {
-		if ((addr-last_addr_) == 1) {
-			// incremental address
-			uart_out.write('$');
-			send_four_chars(dataM, uart_out);
-			uart_out.write('\n');
-			last_data_ = dataM;
-			last_addr_ = addr;
-			return 6;
-		} else {
-			uart_out.write('!');
-			send_four_chars(addr, uart_out);
-			send_four_chars(dataM, uart_out);
-			uart_out.write('\n');
-			last_data_ = dataM;
-			last_addr_ = addr;
-			return 10;
-		}
-	}
-	return 0;
-}
-
-static int make_key_request(
-	hls::stream<char>& uart_out
-) {
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-	uart_out.write('?');
-	uart_out.write('\n');
-	return 2;
-}
-
-void convert_out_to_uart(
-	hls::stream<word_t>& command_out,
-	hls::stream<word_t>& dispadr_out,
-	hls::stream<word_t>& dispdat_out,
-	hls::stream<char>& uart_out
-) {
-	#pragma HLS INTERFACE axis port=command_out depth=32
-	#pragma HLS INTERFACE axis port=dispadr_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_out depth=128
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-	if (!command_out.empty()) {
-		debug_phase_t3_ = 0xD0;
-
-		word_t num_ret = command_out.read();
-		make_hex_chars(num_ret, uart_out);
-
-		debug_phase_t3_ = 0xD2;
-		for (int i = 0; i < num_ret; i++) {
-			word_t data = command_out.read();
-			make_hex_chars(data, uart_out);
-		}
-
-		debug_phase_t3_ = 0xD3;
-		word_t ret_status = command_out.read();
-		make_hex_chars(ret_status, uart_out);
-
-		if (ret_status == BREAK_REASON_KEYIN) {
-			debug_phase_t3_ = 0xDE;
-			make_key_request(uart_out);
-		}
-	} else if (!dispadr_out.empty()) {
-		debug_phase_t3_ = 0xDD;
-		word_t addrM = dispadr_out.read();
-		word_t dataM = dispdat_out.read();
-		make_disp_out(addrM, dataM, uart_out);
-	}
-}
-
-void uart_out_task(
-	hls::stream<word_t>& command_out,
-	hls::stream<word_t>& dispadr_out,
-	hls::stream<word_t>& dispdat_out,
-	hls::stream<char>& uart_out
-) {
-	#pragma HLS INTERFACE axis port=command_out depth=32
-	#pragma HLS INTERFACE axis port=dispadr_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_out depth=128
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-	convert_out_to_uart(command_out, dispadr_out, dispdat_out, uart_out);
-}
-
-#ifndef __SYNTHESIS__
-#define USE_COM "COM2"
-uart_comm uart_comm("\\\\.\\" USE_COM);  // COM2ポートを開く
-#endif
-
-static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
-     // depthを正しく設定しないとCo-simがうまくいかない
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-
-#ifndef __SYNTHESIS__
-	char uo[128];
-	DWORD length = 0;
-	for (int i = 0; i < sizeof(uo); i++) {
-		if (uart_out.empty()) break;
-		uo[i] = uart_out.read();
-		length++;
-	}
-	if (length) {
-		uart_comm.write_data(uo, length);
-	}
-#else
-	while (!uart_out.empty()) {
-    	// TXFIFOが満杯でないか確認
-        if ((uart_reg[STAT_REG_OFFSET] & 0x00000008) == 0) {
-            // データをTXFIFOに書き込む
-            uart_reg[TX_FIFO_OFFSET] = uart_out.read();
-
-        } else {
-            // 満杯だったらいったん中断して次の回に
-            break;
-        }
-	}
-#endif
-}
-
-static bool get_token(
-    volatile unsigned int *uart_reg,
-    hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in,
-    volatile bool& sim_exit
-) {
-    // depthを正しく設定しないとCo-simがうまくいかない
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 
-	#pragma HLS INTERFACE axis port=uart_in depth=32
-
-	static int char_index = 0;
-	static ap_uint<8*TOKEN_SIZE> token = 0;
-	static bool key_in_flag = false;
-
-#ifndef __SYNTHESIS__
-    char read_buf[1];
-    DWORD bytes_read = 0;
-	while ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
-						(bytes_read == sizeof(read_buf))) {
-		debug_rx_data_ = read_buf[0];
-#else
-	if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
-		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
-#endif
-        if (debug_rx_data_ == 'X') {
-            sim_exit = true;
-            return true;
-        }
-		token |= (debug_rx_data_ << 8*char_index);
-		char_index++;
-		if (char_index == TOKEN_SIZE) {
-			uart_in.write(token);
-			char_index = 0;
-			token = 0;
-			return true;
-		}
-	}
-	return false;
-}
-
-static bool initialized = false;
-//static int phase = -1;
-
-void uart_if(
-	bool start,
-	volatile unsigned int *uart_reg,
-	hls::stream<token_word_t>& uart_in,
-	hls::stream<char>& uart_out,
-    volatile bool& sim_exit,
-	volatile char& debug_phase__,
-	volatile char& debug_rx_data__
-) {
-	#pragma HLS INTERFACE ap_none port=start
-    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
-	#pragma HLS INTERFACE axis port=uart_in depth=32
-	#pragma HLS INTERFACE axis port=uart_out depth=128
-    #pragma HLS INTERFACE ap_none port=return
-
-	// ボーレート設定（例：115200 bps）
-	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します
-
-    debug_phase__ = 0;
-	debug_rx_data__ = debug_rx_data_ = 0;
-    sim_exit = false;
-	if (start && !initialized) {
-		debug_phase__ = 2;
-		initialized = true;
-		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ソフトウェアリセット
-		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
-		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
-
-	} else if (start) {
-		//#pragma HLS DATAFLOW
-		//while (1) {
-			debug_phase__ = 6;
-			get_token(uart_reg, uart_in, sim_exit);
-			debug_phase__ = 10;
-			send_chars(uart_reg, uart_out);
-		//}
-    }
-}

@@ -1,6 +1,6 @@
 [
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
@@ -12,7 +12,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_if.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
@@ -24,7 +24,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\comp_task.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
@@ -36,7 +36,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\peripheral_task.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
@@ -48,7 +48,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
@@ -60,7 +60,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_out_task.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
@@ -72,7 +72,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_in_task.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls-tb",
@@ -84,7 +84,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls-tb",
@@ -96,7 +96,7 @@
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\uart_in_task",
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\peripheral_task",
     "arguments": [
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls-tb",

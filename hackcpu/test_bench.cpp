@@ -6,10 +6,15 @@
 #include <iomanip>
 #include <hls_task.h>
 #include <hls_stream.h>
-#include "../common/uart_comm.hpp"
 #include "revasm.hpp"
 #include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
-
+#ifndef SIM_CPU_WRAPPER
+#include "uart_if.hpp"
+#include "uart_in_task.hpp"
+#include "comp_task.hpp"
+#include "peripheral_task.hpp"
+#include "uart_out_task.hpp"
+#endif
 
 #ifndef SIM_CPU_WRAPPER
 // debug using external controller via uart
@@ -27,26 +32,29 @@ int main() {
 	// CPU interface signals
     static hls_thread_local hls::stream<word_t> command_in;
     static hls_thread_local hls::stream<word_t> command_out;
-    static hls_thread_local hls::stream<word_t> dispadr_out;
+    static hls_thread_local hls::stream<word_t> key_in;
+    static hls_thread_local hls::stream<word_t> ext_interrupt_in;
+    static hls_thread_local hls::stream<word_t> interrupt_in;
+    static hls_thread_local hls::stream<addr_t> peripheral_raddr_out;
+    static hls_thread_local hls::stream<word_t> peripheral_rdata_in;
+    static hls_thread_local hls::stream<addr_t> peripheral_waddr_out;
+    static hls_thread_local hls::stream<word_t> peripheral_wdata_out;
+    static hls_thread_local hls::stream<addr_t> dispadr_out;
     static hls_thread_local hls::stream<word_t> dispdat_out;
 
-	hls_thread_local hls::task t1(uart_in_task, uart_in, command_in);
-	hls_thread_local hls::task t2(comp_task, command_in, command_out, dispadr_out, dispdat_out);
-	hls_thread_local hls::task t3(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out);
+
+	hls_thread_local hls::task uit(uart_in_task, uart_in, command_in, key_in, ext_interrupt_in);
+	hls_thread_local hls::task ct(comp_task, command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
+	hls_thread_local hls::task pt(peripheral_task, ext_interrupt_in, interrupt_in, key_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, dispadr_out, dispdat_out);
+	hls_thread_local hls::task uot(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out);
 
     volatile bool sim_exit = false;
 	uart_if(start, uart_reg, uart_in, uart_out, sim_exit, debug_phase__, debug_rx_data__);
 	while(1) {
 		uart_if(start, uart_reg, uart_in, uart_out, sim_exit, debug_phase__, debug_rx_data__);
         if (sim_exit) return 0;
-		debug_phase__ = 7;
-		//uart_in_task(uart_in, command_in);
-		debug_phase__ = 8;
-		//comp_task(command_in, command_out);
-		debug_phase__ = 9;
-		//uart_out_task(command_out, uart_out);
 	}
-    return 0; // never return
+    return 0;
 }
 
 #else // #ifndef SIM_CPU_WRAPPER
@@ -55,8 +63,11 @@ void read_rom_file(
     const std::string& filename,
     hls::stream<word_t>& command_in,
     hls::stream<word_t>& command_out,
-    hls::stream<word_t>& dispadr_out,
-    hls::stream<word_t>& dispdat_out
+    hls::stream<word_t>& interrupt_in,
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    hls::stream<addr_t>& peripheral_waddr_out,
+    hls::stream<word_t>& peripheral_wdata_out
 ) {
     std::ifstream file(filename);
     std::string line;
@@ -78,15 +89,18 @@ void read_rom_file(
     for (int i = 0; i < length; i++) {
         command_in.write(tmp[i]);
     }
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
 }
 
 void get_debug_info(
     hls::stream<word_t>& command_in, 
     hls::stream<word_t>& command_out, 
-    hls::stream<word_t>& dispadr_out,
-    hls::stream<word_t>& dispdat_out,
+    hls::stream<word_t>& interrupt_in,
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    hls::stream<addr_t>& peripheral_waddr_out,
+    hls::stream<word_t>& peripheral_wdata_out,
     word_t bitmap, 
     debug_s& dinfo
 ) {
@@ -94,7 +108,7 @@ void get_debug_info(
     command_in.write(RESET_BIT_HALT);
     command_in.write(GET_DEBUG_INFO);
     command_in.write(bitmap);
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     
     if (bitmap & DINFO_BIT_CYCLE) {
@@ -166,8 +180,11 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
 int compare(
     hls::stream<word_t>& command_in, 
     hls::stream<word_t>& command_out, 
-    hls::stream<word_t>& dispadr_out,
-    hls::stream<word_t>& dispdat_out,
+    hls::stream<word_t>& interrupt_in,
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    hls::stream<addr_t>& peripheral_waddr_out,
+    hls::stream<word_t>& peripheral_wdata_out,
     bool header
 ) {
 
@@ -175,7 +192,7 @@ int compare(
     		        DINFO_BIT_INST1 | DINFO_BIT_INST2 | DINFO_BIT_WOUT |
     		        DINFO_BIT_ADDRM | DINFO_BIT_OUTM | DINFO_BIT_SP;
     debug_s dinfo;
-    get_debug_info(command_in, command_out, dispadr_out, dispdat_out, bitmap, dinfo);
+    get_debug_info(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, bitmap, dinfo);
     show_debug_info(bitmap, dinfo, header);
     return 0;
 }
@@ -185,35 +202,38 @@ int main() {
     // CPU interface signals
     hls::stream<word_t> command_in;
     hls::stream<word_t> command_out;
-    hls_thread_local hls::stream<word_t> dispadr_out;
-    hls_thread_local hls::stream<word_t> dispdat_out;
+    hls::stream<word_t> interrupt_in;
+    hls::stream<addr_t> peripheral_raddr_out;
+    hls::stream<word_t> peripheral_rdata_in;
+    hls::stream<addr_t> peripheral_waddr_out;
+    hls::stream<word_t> peripheral_wdata_out;
 
     // Reset CPU
     command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_RESET | RESET_BIT_HALT);
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     command_in.write(SET_RESET_CONFIG);
     command_in.write(RESET_BIT_HALT);
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
 
     // Write to ROM
     // Read ROM content from file
     //read_rom_file("rom_string_test.bin", command_in, command_out);
-    read_rom_file("rom_pong.bin", command_in, command_out, dispadr_out, dispdat_out);
+    read_rom_file("rom_pong.bin", command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 
     // For rect example
     command_in.write(WRITE_TO_DRAM);
     command_in.write(0x0000);
     command_in.write(0x0014);
 
-    command_in.write(SET_BREAK_CONDITION);
-    command_in.write(BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN);
+    //command_in.write(SET_BREAK_CONDITION); // obsolete
+    //command_in.write(BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN);
     //command_in.write(0x8000);
 
 //    command_in.write(STEP_EXECUTION);
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
 
     // Run CPU cycle
@@ -221,15 +241,15 @@ int main() {
     // Run through
     command_in.write(SET_RESET_CONFIG);
     command_in.write(0);
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     #elif 0
     // Step debugging
     for (int i = 0; i < 5000000; i++) {
         command_in.write(STEP_EXECUTION);
-        cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+        cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
         DUMMY_READ();
-        compare(command_in, command_out, dispadr_out, dispdat_out, (i == 0), uart_comm);
+        compare(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, (i == 0));
     }
     #else
     // Run until mem out
@@ -239,9 +259,9 @@ int main() {
     command_in.write(0);
     for (int i = 0; i < 2000; i++) {
         command_in.write(NORMAL_OPERATION);
-        cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+        cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
         DUMMY_READ();
-        compare(command_in, command_out, dispadr_out, dispdat_out, (i == 0));
+        compare(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, (i == 0));
     }
     #endif
 
@@ -249,7 +269,7 @@ int main() {
     command_in.write(RESET_BIT_HALT);
     command_in.write(READ_FROM_DRAM);
     command_in.write(0x0007);
-    cpu_wrapper(command_in, command_out, dispadr_out, dispdat_out);
+    cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     return 0;
 }

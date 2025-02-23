@@ -19,6 +19,18 @@
       "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
       "-DSIM_CPU_WRAPPER",
       "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls-tb",
+      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "-DSIM_CPU_WRAPPER",
+      "-c",
       "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"
     ],
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"

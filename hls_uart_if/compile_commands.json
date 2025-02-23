@@ -5,11 +5,71 @@
       "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
       "-fhls",
       "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
-      "-D__SYNTHESIS__",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_if.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_if.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\comp_task.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\comp_task.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\peripheral_task.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\peripheral_task.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "",
       "-c",
       "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
     ],
     "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_out_task.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_out_task.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_in_task.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\uart_in_task.cpp"
   },
   {
     "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",

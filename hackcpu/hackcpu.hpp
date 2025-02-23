@@ -1,3 +1,7 @@
+// Hack CPU module 
+#ifndef __HACKCPU_HPP__
+#define __HACKCPU_HPP__
+
 #include <ap_int.h>
 #include <cstdint>
 #include <hls_stream.h>
@@ -15,7 +19,7 @@
 const int WORD_WIDTH = 16;
 const int ADDR_WIDTH = 15;
 const int IRAM_SIZE  = 1 << ADDR_WIDTH;
-const int DRAM_SIZE  = 1 << ADDR_WIDTH;
+const int DRAM_SIZE  = (1 << ADDR_WIDTH) >> 1;
 const int TRARCE_SIZE = 32;
 
 // Debug instruction
@@ -28,9 +32,10 @@ typedef enum {
 	BREAK_REASON_RESET     = 0x8801,
 	BREAK_REASON_CYCLE     = 0x8802,
 	BREAK_REASON_STOP      = 0x8804,
-	BREAK_REASON_DISP      = 0x8808,
-	BREAK_REASON_INTERVAL  = 0x8810,
-	BREAK_REASON_KEYIN     = 0x8820
+	BREAK_REASON_DISP      = 0x8808, // obsolete
+	BREAK_REASON_INTERVAL  = 0x8810, // obsolete
+	BREAK_REASON_KEYIN     = 0x8820, // obsolete
+	BREAK_REASON_EXT       = 0x8880, // External signal
 } break_reason_e;
 
 // Define CPU components
@@ -62,9 +67,9 @@ typedef enum {
 } reset_config_bitmap_e;
 
 typedef enum {
-	BREAK_CONDITION_BIT_DISPOUT  = 0x0001,
-	BREAK_CONDITION_BIT_INTERVAL = 0x0002,
-	BREAK_CONDITION_BIT_KEYIN    = 0x0004,
+	BREAK_CONDITION_BIT_DISPOUT  = 0x0001, // obsolete
+	BREAK_CONDITION_BIT_INTERVAL = 0x0002, // obsolete
+	BREAK_CONDITION_BIT_KEYIN    = 0x0004, // obsolete
 } break_condition_bitmap_e;
 
 typedef enum {
@@ -109,35 +114,19 @@ typedef struct {
 
 typedef ap_uint<8*TOKEN_SIZE> token_word_t;
 
+#define PERIPHERAL_START_ADDR   (0x4000)
+#define PERIPHERAL_DISPMEM_ADDR (PERIPHERAL_START_ADDR)
+#define PERIPHERAL_DISPMEM_SIZE (0x2000)
+#define PERIPHERAL_KEYIN_ADDR   (0x6000)
+
 // declarations of top functions
 void cpu_wrapper(
     hls::stream<word_t>& command_packet_in,
     hls::stream<word_t>& command_packet_out,
-	hls::stream<word_t>& dispadr_out,
-	hls::stream<word_t>& dispdat_out
+    hls::stream<word_t>& interrupt_in,
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    hls::stream<addr_t>& peripheral_waddr_out,
+    hls::stream<word_t>& peripheral_wdata_out
 );
-void uart_if(
-	bool start,
-	volatile unsigned int *uart_reg,
-	hls::stream<token_word_t>& uart_in,
-	hls::stream<char>& uart_out,
-    volatile bool& sim_exit,
-	volatile char& debug_phase__,
-	volatile char& debug_rx_data__
-);
-void uart_in_task(
-	hls::stream<token_word_t>& uart_in,
-	hls::stream<word_t>& command_in
-);
-void comp_task(
-	hls::stream<word_t>& command_in,
-	hls::stream<word_t>& command_out,
-	hls::stream<word_t>& dispadr_out,
-	hls::stream<word_t>& dispdat_out
-);
-void uart_out_task(
-	hls::stream<word_t>& command_out,
-	hls::stream<word_t>& dispadr_out,
-	hls::stream<word_t>& dispdat_out,
-	hls::stream<char>& uart_out
-);
+#endif // #ifndef __HACKCPU_HPP__
