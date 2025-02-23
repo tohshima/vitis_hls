@@ -653,11 +653,11 @@ void uart_out_task(
 
 #ifndef __SYNTHESIS__
 #define USE_COM "COM2"
-uart_comm uart_comm("\\\\.\\" USE_COM);  // COM2ƒ|[ƒg‚ğŠJ‚­
+uart_comm uart_comm("\\\\.\\" USE_COM);  // COM2ãƒãƒ¼ãƒˆã‚’é–‹ã
 #endif
 
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
-     // depth‚ğ³‚µ‚­İ’è‚µ‚È‚¢‚ÆCo-sim‚ª‚¤‚Ü‚­‚¢‚©‚È‚¢
+     // depthã‚’æ­£ã—ãè¨­å®šã—ãªã„ã¨Co-simãŒã†ã¾ãã„ã‹ãªã„
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20
 	#pragma HLS INTERFACE axis port=uart_out depth=128
 
@@ -674,13 +674,13 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 	}
 #else
 	while (!uart_out.empty()) {
-    	// TXFIFO‚ª–”t‚Å‚È‚¢‚©Šm”F
+    	// TXFIFOãŒæº€æ¯ã§ãªã„ã‹ç¢ºèª
         if ((uart_reg[STAT_REG_OFFSET] & 0x00000008) == 0) {
-            // ƒf[ƒ^‚ğTXFIFO‚É‘‚«‚Ş
+            // ãƒ‡ãƒ¼ã‚¿ã‚’TXFIFOã«æ›¸ãè¾¼ã‚€
             uart_reg[TX_FIFO_OFFSET] = uart_out.read();
 
         } else {
-            // –”t‚¾‚Á‚½‚ç‚¢‚Á‚½‚ñ’†’f‚µ‚ÄŸ‚Ì‰ñ‚É
+            // æº€æ¯ã ã£ãŸã‚‰ã„ã£ãŸã‚“ä¸­æ–­ã—ã¦æ¬¡ã®å›ã«
             break;
         }
 	}
@@ -691,7 +691,7 @@ static bool get_token(
 	    volatile unsigned int *uart_reg,
 		hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in
 ) {
-    // depth‚ğ³‚µ‚­İ’è‚µ‚È‚¢‚ÆCo-sim‚ª‚¤‚Ü‚­‚¢‚©‚È‚¢
+    // depthã‚’æ­£ã—ãè¨­å®šã—ãªã„ã¨Co-simãŒã†ã¾ãã„ã‹ãªã„
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 
@@ -733,22 +733,22 @@ void uart_if(
 	volatile char& debug_rx_data__
 ) {
 	#pragma HLS INTERFACE ap_none port=start
-    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depth‚ğ³‚µ‚­İ’è‚µ‚È‚¢‚ÆCo-sim‚ª‚¤‚Ü‚­‚¢‚©‚È‚¢
+    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthã‚’æ­£ã—ãè¨­å®šã—ãªã„ã¨Co-simãŒã†ã¾ãã„ã‹ãªã„
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 	#pragma HLS INTERFACE axis port=uart_out depth=128
     #pragma HLS INTERFACE ap_none port=return
 
-	// ƒ{[ƒŒ[ƒgİ’èi—áF115200 bpsj
-	// ’: ÀÛ‚Ìƒ{[ƒŒ[ƒgİ’è‚ÍUART Lite IP‚Ìİ’è‚ÉˆË‘¶‚µ‚Ü‚·
+	// ãƒœãƒ¼ãƒ¬ãƒ¼ãƒˆè¨­å®šï¼ˆä¾‹ï¼š115200 bpsï¼‰
+	// æ³¨: å®Ÿéš›ã®ãƒœãƒ¼ãƒ¬ãƒ¼ãƒˆè¨­å®šã¯UART Lite IPã®è¨­å®šã«ä¾å­˜ã—ã¾ã™
 
     debug_phase__ = 0;
 	debug_rx_data__ = debug_rx_data_ = 0;
 	if (start && !initialized) {
 		debug_phase__ = 2;
 		initialized = true;
-		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ƒ\ƒtƒgƒEƒFƒAƒŠƒZƒbƒg
-		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // ƒŠƒZƒbƒg‰ğœ
-		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RXŠ„‚è‚İ‚ğ—LŒø‰»
+		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ã‚½ãƒ•ãƒˆã‚¦ã‚§ã‚¢ãƒªã‚»ãƒƒãƒˆ
+		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // ãƒªã‚»ãƒƒãƒˆè§£é™¤
+		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RXå‰²ã‚Šè¾¼ã¿ã‚’æœ‰åŠ¹åŒ–
 
 	} else if (start) {
 		//#pragma HLS DATAFLOW
