@@ -96,15 +96,9 @@ typedef struct {
     word_t		sp;
 } debug_s;
 
-void cpu_wrapper(hls::stream<word_t>& command_packet_in,
-                 hls::stream<word_t>& command_packet_out);
-
-void uart_bridge(const char char_in[4], bool& auto_continue_requested,
-		char char_out[108], word_t& num_char_out, word_t& num_disp_out, bool& key_requested);
-
 #define DUMMY_READ() {while(!command_out.empty()) {command_out.read();}}
 
-// UART Lite レジスタのオフセット
+// UART Lite IP consts
 #define RX_FIFO_OFFSET  0x0
 #define TX_FIFO_OFFSET  0x1
 #define STAT_REG_OFFSET  0x2
@@ -115,6 +109,13 @@ void uart_bridge(const char char_in[4], bool& auto_continue_requested,
 
 typedef ap_uint<8*TOKEN_SIZE> token_word_t;
 
+// declarations of top functions
+void cpu_wrapper(
+    hls::stream<word_t>& command_packet_in,
+    hls::stream<word_t>& command_packet_out,
+	hls::stream<word_t>& dispadr_out,
+	hls::stream<word_t>& dispdat_out
+);
 void uart_if(
 	bool start,
 	volatile unsigned int *uart_reg,
