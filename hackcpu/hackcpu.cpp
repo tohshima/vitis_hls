@@ -656,17 +656,9 @@ void uart_out_task(
 uart_comm uart_comm("\\\\.\\" USE_COM);  // COM2ポートを開く
 #endif
 
-static void send_char(volatile unsigned int *uart_reg, const char c) {
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
-
-	// TXFIFOが満杯でないか確認
-	while ((uart_reg[STAT_REG_OFFSET] & 0x00000008)) {};
-	// データをTXFIFOに書き込む
-	uart_reg[TX_FIFO_OFFSET] = c;
-}
-
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+     // depthを正しく設定しないとCo-simがうまくいかない
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20
 	#pragma HLS INTERFACE axis port=uart_out depth=128
 
 #ifndef __SYNTHESIS__
@@ -682,7 +674,15 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 	}
 #else
 	while (!uart_out.empty()) {
-		send_char(uart_reg, uart_out.read());
+    	// TXFIFOが満杯でないか確認
+        if ((uart_reg[STAT_REG_OFFSET] & 0x00000008) == 0) {
+            // データをTXFIFOに書き込む
+            uart_reg[TX_FIFO_OFFSET] = uart_out.read();
+
+        } else {
+            // 満杯だったらいったん中断して次の回に
+            break;
+        }
 	}
 #endif
 }
@@ -691,7 +691,8 @@ static bool get_token(
 	    volatile unsigned int *uart_reg,
 		hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in
 ) {
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+    // depthを正しく設定しないとCo-simがうまくいかない
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 
 	static int char_index = 0;
@@ -733,6 +734,8 @@ void uart_if(
 ) {
 	#pragma HLS INTERFACE ap_none port=start
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+	#pragma HLS INTERFACE axis port=uart_in depth=32
+	#pragma HLS INTERFACE axis port=uart_out depth=128
     #pragma HLS INTERFACE ap_none port=return
 
 	// ボーレート設定（例：115200 bps）
@@ -749,10 +752,8 @@ void uart_if(
 
 	} else if (start) {
 		//#pragma HLS DATAFLOW
-
 		//while (1) {
 			debug_phase__ = 6;
-
 			get_token(uart_reg, uart_in);
 			debug_phase__ = 10;
 			send_chars(uart_reg, uart_out);
