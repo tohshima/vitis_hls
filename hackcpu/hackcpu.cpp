@@ -688,8 +688,9 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 }
 
 static bool get_token(
-	    volatile unsigned int *uart_reg,
-		hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in
+    volatile unsigned int *uart_reg,
+    hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in,
+    volatile bool& sim_exit
 ) {
     // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 
@@ -709,6 +710,10 @@ static bool get_token(
 	if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
 		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
 #endif
+        if (debug_rx_data_ == 'X') {
+            sim_exit = true;
+            return true;
+        }
 		token |= (debug_rx_data_ << 8*char_index);
 		char_index++;
 		if (char_index == TOKEN_SIZE) {
@@ -729,6 +734,7 @@ void uart_if(
 	volatile unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
+    volatile bool& sim_exit,
 	volatile char& debug_phase__,
 	volatile char& debug_rx_data__
 ) {
@@ -743,6 +749,7 @@ void uart_if(
 
     debug_phase__ = 0;
 	debug_rx_data__ = debug_rx_data_ = 0;
+    sim_exit = false;
 	if (start && !initialized) {
 		debug_phase__ = 2;
 		initialized = true;
@@ -754,7 +761,7 @@ void uart_if(
 		//#pragma HLS DATAFLOW
 		//while (1) {
 			debug_phase__ = 6;
-			get_token(uart_reg, uart_in);
+			get_token(uart_reg, uart_in, sim_exit);
 			debug_phase__ = 10;
 			send_chars(uart_reg, uart_out);
 		//}

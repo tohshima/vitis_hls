@@ -34,9 +34,11 @@ int main() {
 	hls_thread_local hls::task t2(comp_task, command_in, command_out, dispadr_out, dispdat_out);
 	hls_thread_local hls::task t3(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out);
 
-	uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_rx_data__);
+    volatile bool sim_exit = false;
+	uart_if(start, uart_reg, uart_in, uart_out, sim_exit, debug_phase__, debug_rx_data__);
 	while(1) {
-		uart_if(start, uart_reg, uart_in, uart_out, debug_phase__, debug_rx_data__);
+		uart_if(start, uart_reg, uart_in, uart_out, sim_exit, debug_phase__, debug_rx_data__);
+        if (sim_exit) return 0;
 		debug_phase__ = 7;
 		//uart_in_task(uart_in, command_in);
 		debug_phase__ = 8;
