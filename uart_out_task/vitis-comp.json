@@ -1,0 +1,11 @@
+{
+  "name": "uart_out_task",
+  "type": "HLS",
+  "configuration": {
+    "componentType": "HLS",
+    "configFiles": [
+      "hls_config_uart_out_task.cfg"
+    ],
+    "work_dir": "uart_out_task"
+  }
+}

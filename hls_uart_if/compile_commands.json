@@ -1,0 +1,50 @@
+[
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls",
+      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls-tb",
+      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls-tb",
+      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"
+  },
+  {
+    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hls_uart_if",
+    "arguments": [
+      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "-fhls-tb",
+      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "",
+      "-c",
+      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\common\\uart_comm.cpp"
+    ],
+    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\common\\uart_comm.cpp"
+  }
+]

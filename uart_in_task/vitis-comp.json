@@ -1,0 +1,11 @@
+{
+  "name": "uart_in_task",
+  "type": "HLS",
+  "configuration": {
+    "componentType": "HLS",
+    "configFiles": [
+      "hls_config_uart_in_task.cfg"
+    ],
+    "work_dir": "uart_in_task"
+  }
+}
