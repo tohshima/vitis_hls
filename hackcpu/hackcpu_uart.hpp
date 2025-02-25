@@ -8,6 +8,6 @@
 #include "hackcpu.hpp"
 
 int hackcpu_uart(
-	volatile unsigned int *uart_reg
+	unsigned int *uart_reg
 );
 #endif // #ifndef __HACKCPU_UART_HPP__
