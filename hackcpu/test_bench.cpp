@@ -25,7 +25,7 @@
 int main() {
     #ifdef USE_HACKCPU_UART
 
-    volatile unsigned int uart_reg[4] = {0};
+    unsigned int uart_reg[4] = {0};
     return hackcpu_uart(uart_reg);
 
     #else
