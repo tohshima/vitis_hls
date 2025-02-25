@@ -1,0 +1,11 @@
+{
+  "name": "hackcpu_uart",
+  "type": "HLS",
+  "configuration": {
+    "componentType": "HLS",
+    "configFiles": [
+      "hls_config_hackcpu_uart.cfg"
+    ],
+    "work_dir": "hackcpu_uart"
+  }
+}

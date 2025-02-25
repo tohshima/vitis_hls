@@ -9,16 +9,26 @@
 #include "revasm.hpp"
 #include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
 #ifndef SIM_CPU_WRAPPER
+#ifdef USE_HACKCPU_UART
+#include "hackcpu_uart.hpp"
+#else
 #include "uart_if.hpp"
 #include "uart_in_task.hpp"
 #include "comp_task.hpp"
 #include "peripheral_task.hpp"
 #include "uart_out_task.hpp"
 #endif
+#endif
 
 #ifndef SIM_CPU_WRAPPER
 // debug using external controller via uart
 int main() {
+    #ifdef USE_HACKCPU_UART
+
+    volatile unsigned int uart_reg[4] = {0};
+    return hackcpu_uart(uart_reg);
+
+    #else
 	bool start = true;
 	//ap_uint<1> interrupt = 0;
     volatile unsigned int uart_reg[4] = {0};
@@ -55,6 +65,7 @@ int main() {
         if (sim_exit) return 0;
 	}
     return 0;
+    #endif
 }
 
 #else // #ifndef SIM_CPU_WRAPPER
