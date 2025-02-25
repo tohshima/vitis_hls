@@ -41,7 +41,6 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 #endif
 }
 
-static volatile char debug_rx_data_ = 0;
 
 static bool get_token(
     volatile unsigned int *uart_reg,
@@ -52,6 +51,7 @@ static bool get_token(
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 
+    static char debug_rx_data_ = 0;
 	static int char_index = 0;
 	static ap_uint<8*TOKEN_SIZE> token = 0;
 	static bool key_in_flag = false;
@@ -82,43 +82,33 @@ static bool get_token(
 	return false;
 }
 
-static bool initialized = false;
-//static int phase = -1;
-
 void uart_if(
-	bool start,
-	volatile unsigned int *uart_reg,
+	unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
-    volatile bool& sim_exit,
-	volatile char& debug_phase__,
-	volatile char& debug_rx_data__
+    bool& sim_exit
 ) {
-	#pragma HLS INTERFACE ap_none port=start
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 	#pragma HLS INTERFACE axis port=uart_out depth=128
     #pragma HLS INTERFACE ap_none port=return
 
+    static bool initialized = false;
+
 	// ボーレート設定（例：115200 bps）
 	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します
 
-    debug_phase__ = 0;
-	debug_rx_data__ = debug_rx_data_ = 0;
     sim_exit = false;
-	if (start && !initialized) {
-		debug_phase__ = 2;
+	if (!initialized) {
 		initialized = true;
 		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ソフトウェアリセット
 		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
 		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
 
-	} else if (start) {
+	} else {
 		//#pragma HLS DATAFLOW
 		//while (1) {
-			debug_phase__ = 6;
 			get_token(uart_reg, uart_in, sim_exit);
-			debug_phase__ = 10;
 			send_chars(uart_reg, uart_out);
 		//}
     }

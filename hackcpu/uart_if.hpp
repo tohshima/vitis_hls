@@ -7,12 +7,9 @@
 #include "hackcpu.hpp"
 
 void uart_if(
-	bool start,
-	volatile unsigned int *uart_reg,
+	unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
-    volatile bool& sim_exit,
-	volatile char& debug_phase__,
-	volatile char& debug_rx_data__
+    bool& sim_exit
 );
 #endif // #ifndef __UART_IF_HPP__
