@@ -56,6 +56,9 @@ void peripheral_task(
         } else if ((raddr >= PERIPHERAL_DISPMEM_ADDR) && (raddr < (PERIPHERAL_DISPMEM_ADDR+PERIPHERAL_DISPMEM_SIZE))) {
             // DISP MEM read
             peripheral_rdata_in.write(disp_ram[raddr-PERIPHERAL_DISPMEM_ADDR]);
+        } else {
+            // Send dummy data
+            peripheral_rdata_in.write(0xDEAD);
         }
     }
 }

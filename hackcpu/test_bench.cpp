@@ -29,13 +29,7 @@ int main() {
     return hackcpu_uart(uart_reg);
 
     #else
-	bool start = true;
-	//ap_uint<1> interrupt = 0;
-    volatile unsigned int uart_reg[4] = {0};
-	volatile char debug_phase__ = 0;
-	volatile word_t debug_command__ = 0;
-	volatile char debug_rx_data__ = 0;
-	volatile char debug_injection = 0;
+    unsigned int uart_reg[4] = {0};
 
 	static hls_thread_local hls::stream<token_word_t> uart_in;
 	static hls_thread_local hls::stream<char> uart_out;
@@ -59,9 +53,9 @@ int main() {
 	hls_thread_local hls::task uot(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out);
 
     volatile bool sim_exit = false;
-	uart_if(start, uart_reg, uart_in, uart_out, sim_exit, debug_phase__, debug_rx_data__);
+	uart_if(uart_reg, uart_in, uart_out, sim_exit);
 	while(1) {
-		uart_if(start, uart_reg, uart_in, uart_out, sim_exit, debug_phase__, debug_rx_data__);
+		uart_if(uart_reg, uart_in, uart_out, sim_exit);
         if (sim_exit) return 0;
 	}
     return 0;
