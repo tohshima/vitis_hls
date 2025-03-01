@@ -2,7 +2,7 @@
 #include "hackcpu.hpp"
 #include "uart_if.hpp"
 #ifndef __SYNTHESIS__
-#include "uart_comm.hpp"
+#include "../common/uart_comm.hpp"
 #endif
 
 #ifndef __SYNTHESIS__
