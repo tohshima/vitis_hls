@@ -34,7 +34,8 @@ void peripheral_task(
     if (!ext_interrupt_in.empty()) {
         // Interrupt
         interrupt_in.write(ext_interrupt_in.read()); // ToDo: various interrupt should be handled in future
-    } else if (!peripheral_waddr_out.empty()) {
+    }
+    if (!peripheral_waddr_out.empty()) {
         // Write access to peripheral from the cpu
         addr_t waddr = peripheral_waddr_out.read();
         word_t wdata = peripheral_wdata_out.read();
@@ -44,7 +45,8 @@ void peripheral_task(
             dispdat_out.write(wdata);
             disp_ram[waddr-PERIPHERAL_DISPMEM_ADDR] = wdata; // store for RMW
         }
-    } else if (!peripheral_raddr_out.empty()) {
+    }
+    if (!peripheral_raddr_out.empty()) {
         // Read access to peripheral from the cpu
         addr_t raddr = peripheral_raddr_out.read();
         if (raddr == PERIPHERAL_KEYIN_ADDR) {
