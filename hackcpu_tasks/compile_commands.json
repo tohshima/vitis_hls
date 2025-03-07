@@ -7,6 +7,18 @@
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
       "",
       "-c",
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/peripheral_task.cpp"
+    ],
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/peripheral_task.cpp"
+  },
+  {
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_tasks",
+    "arguments": [
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
+      "-fhls",
+      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
+      "",
+      "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_in_task.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_in_task.cpp"
@@ -31,9 +43,21 @@
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
       "",
       "-c",
-      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/peripheral_task.cpp"
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_if.cpp"
     ],
-    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/peripheral_task.cpp"
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_if.cpp"
+  },
+  {
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_tasks",
+    "arguments": [
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
+      "-fhls",
+      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
+      "",
+      "-c",
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
+    ],
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
   },
   {
     "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_tasks",
@@ -70,18 +94,6 @@
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench.cpp"
-  },
-  {
-    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_tasks",
-    "arguments": [
-      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
-      "-fhls-tb",
-      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
-      "-DSIM_TASKS",
-      "-c",
-      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
-    ],
-    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
   },
   {
     "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_tasks",
