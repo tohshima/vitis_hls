@@ -7,17 +7,12 @@
 #include "uart_out_task.hpp"
 #include "hackcpu_uart.hpp"
 
-int hackcpu_uart(
-	unsigned int *uart_reg
+void start_tasks(
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<char>& uart_out
 ) {
-    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
-    #pragma HLS INTERFACE ap_none port=return
+    #pragma HLS INLINE
 
-    #pragma HLS DATAFLOW
-	hls_thread_local hls::stream<token_word_t> uart_in;
-    #pragma HLS STREAM variable=uart_in depth=32
-	hls_thread_local hls::stream<char> uart_out;
-    #pragma HLS STREAM variable=uart_out depth=128
 	// CPU interface signals
     hls_thread_local hls::stream<word_t> command_in;
     #pragma HLS STREAM variable=command_in depth=32
@@ -46,6 +41,22 @@ int hackcpu_uart(
 	hls_thread_local hls::task ct(comp_task, command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 	hls_thread_local hls::task pt(peripheral_task, ext_interrupt_in, interrupt_in, key_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, dispadr_out, dispdat_out);
 	hls_thread_local hls::task uot(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out);
+}
+
+#ifndef SIM_TASKS
+int hackcpu_uart(
+	unsigned int *uart_reg
+) {
+    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+    #pragma HLS INTERFACE ap_none port=return
+
+    #pragma HLS DATAFLOW
+	hls_thread_local hls::stream<token_word_t> uart_in;
+    #pragma HLS STREAM variable=uart_in depth=32
+	hls_thread_local hls::stream<char> uart_out;
+    #pragma HLS STREAM variable=uart_out depth=128
+	
+    start_tasks(uart_in, uart_out);
 
     bool sim_exit = false;
 	for(;;) {
@@ -54,3 +65,4 @@ int hackcpu_uart(
         if (sim_exit) return 0;
 	}
 }
+#endif

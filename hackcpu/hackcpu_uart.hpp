@@ -7,6 +7,10 @@
 #include <hls_stream.h>
 #include "hackcpu.hpp"
 
+void start_tasks(
+	hls::stream<token_word_t>& uart_in,
+	hls::stream<char>& uart_out
+);
 int hackcpu_uart(
 	unsigned int *uart_reg
 );
