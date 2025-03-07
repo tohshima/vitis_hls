@@ -1,15 +1,17 @@
+// test bench for hackcpu
 #include <iostream>
 #include <bitset>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <iomanip>
+#include <stdlib.h>
 #include <hls_task.h>
 #include <hls_stream.h>
 #include "revasm.hpp"
 #include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
 #ifndef SIM_CPU_WRAPPER
-#ifdef USE_HACKCPU_UART
+#if defined(USE_HACKCPU_UART) || defined(SIM_TASKS)
 #include "hackcpu_uart.hpp"
 #else
 #include "uart_if.hpp"
@@ -20,7 +22,9 @@
 #endif
 #endif
 
+
 #ifndef SIM_CPU_WRAPPER
+#ifndef SIM_TASKS
 // debug using external controller via uart
 int main() {
     #ifdef USE_HACKCPU_UART
@@ -61,6 +65,112 @@ int main() {
     return 0;
     #endif
 }
+#else // #ifndef SIM_TASKS
+// task level simulation
+static int send_token(
+    word_t data,
+    hls::stream<token_word_t>& uart_in
+) {
+    static int count = 0;
+    token_word_t token = 0;
+    for (int i = 0; i < 4; i++) {
+        unsigned int digit = (data.to_ushort() >> (3-i)*4) & 0xF;
+        char digit_char = (digit < 10)? '0'+digit: 'a'+(digit-10);
+        token |= digit_char << 8*i;
+    }
+    while (uart_in.full()) {}
+    uart_in.write(token);
+    char pbuf[32];
+    sprintf(pbuf, "In  %06d: %04x.\n", count++, data.to_ushort());
+    std::cout << pbuf << std::flush;
+    return count;
+}
+static int receive_line(
+    char* rbuf,
+    hls::stream<char>& uart_out
+) {
+    static int count = 0;
+    static int index = 0;
+    while (1) {
+        if (!uart_out.empty()) {
+        char r = uart_out.read();
+        if (r == '\n') {
+            rbuf[index] = '\0';
+            index = 0;
+            char pbuf[32];
+            sprintf(pbuf, "Out %06d: %s.\n", count++, rbuf);
+            std::cout << pbuf << std::flush;
+            return count;
+        }
+        rbuf[index++] = r;
+        }
+    }
+}
+static void get_status(
+    hls::stream<char>& uart_out
+) {
+    char rbuf[16];
+    receive_line(rbuf, uart_out);
+    unsigned int num = strtol(rbuf, NULL, 16);
+    for (int i = 0; i < num; i++) {
+        receive_line(rbuf, uart_out);
+    }
+    receive_line(rbuf, uart_out);
+}
+static void read_rom_file(
+    const std::string& filename,
+    hls::stream<token_word_t>& uart_in,
+    hls::stream<char>& uart_out
+) {
+    std::ifstream file(filename);
+    std::string line;
+
+    word_t tmp[IRAM_SIZE];
+    
+    int length = 0;
+    while (std::getline(file, line)) {
+        word_t instruction = 0;
+        for (char c : line) {
+            instruction = (instruction << 1) | (c - '0');
+        }
+        tmp[length++] = instruction;
+        printf("%s %08x\n", line.c_str(), instruction.to_ushort());
+    }
+    send_token(LOAD_TO_IRAM, uart_in);
+    send_token(0, uart_in);
+    send_token(length, uart_in);
+    for (int i = 0; i < length; i++) {
+        send_token(tmp[i], uart_in);
+    }
+    get_status(uart_out);
+}
+int main() {
+
+	hls_thread_local hls::stream<token_word_t> uart_in;
+    #pragma HLS STREAM variable=uart_in depth=32
+	hls_thread_local hls::stream<char> uart_out;
+    #pragma HLS STREAM variable=uart_out depth=128
+	
+    start_tasks(uart_in, uart_out);
+
+    send_token(SET_RESET_CONFIG, uart_in);
+    send_token(0x0003, uart_in);
+    get_status(uart_out);
+
+    send_token(SET_RESET_CONFIG, uart_in);
+    send_token(0x0002, uart_in);
+    get_status(uart_out);
+
+    read_rom_file("rom_pong.bin", uart_in, uart_out);
+
+    send_token(NORMAL_OPERATION, uart_in);
+    
+    char rbuf[128];
+    while (receive_line(rbuf, uart_out) <= 9000) {}
+    return 0;
+}
+
+#endif // #ifndef SIM_TASKS
 
 #else // #ifndef SIM_CPU_WRAPPER
 // only debug cpu_wrapper
