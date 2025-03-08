@@ -28,7 +28,7 @@ void uart_in_task(
 	hls::stream<word_t>& key_in,
 	hls::stream<word_t>& ext_interrupt_in
 ) {
-	#pragma HLS INTERFACE axis port=uart_in depth=32
+	#pragma HLS INTERFACE axis port=uart_in depth=4
 	#pragma HLS INTERFACE axis port=command_in depth=32
 	#pragma HLS INTERFACE axis port=key_in depth=4
 	#pragma HLS INTERFACE axis port=ext_interrupt_in depth=4

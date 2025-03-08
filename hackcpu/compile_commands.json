@@ -1,50 +1,50 @@
 [
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu",
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu",
     "arguments": [
-      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
-      "-hls-syn-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\common\\technology\\autopilot",
+      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
       "-DALLOW_EMPTY_HLS_STREAM_READS",
       "-c",
-      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu.cpp"
     ],
-    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\hackcpu.cpp"
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu",
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu",
     "arguments": [
-      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls-tb",
-      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
       "-DSIM_CPU_WRAPPER",
       "-c",
-      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/C:\\Users\\tetsu\\vitis_hls\\work\\dev\\common\\uart_comm.cpp"
     ],
-    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/C:\\Users\\tetsu\\vitis_hls\\work\\dev\\common\\uart_comm.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu",
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu",
     "arguments": [
-      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls-tb",
-      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
       "-DSIM_CPU_WRAPPER",
       "-c",
-      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench.cpp"
     ],
-    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\test_bench.cpp"
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench.cpp"
   },
   {
-    "directory": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu",
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu",
     "arguments": [
-      "E:\\Xilinx\\Vitis_HLS\\2024.1\\vcxx\\libexec\\clang++.exe",
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls-tb",
-      "-hls-sim-headers-dir=E:\\Xilinx\\Vitis_HLS\\2024.1\\include",
+      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
       "-DSIM_CPU_WRAPPER",
       "-c",
-      "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\common\\uart_comm.cpp"
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
     ],
-    "file": "C:\\Users\\tetsu\\vitis_hls\\work\\dev\\common\\uart_comm.cpp"
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/C:\\Users\\tetsu\\vitis_hls\\work\\dev\\hackcpu\\revasm.cpp"
   }
 ]

@@ -50,7 +50,7 @@ static void compM(
     #pragma HLS inline
     
     word_t x = D;
-    if (A >= PERIPHERAL_START_ADDR) {
+    if (A >= PERIPHERAL_KEYIN_ADDR) {
         // Input from peripheral modules, mainly used for a key input in the current design.
         periheral_raddr_out.write(A);
         word_t y = periheral_rdata_in.read();
@@ -80,10 +80,9 @@ static void get_destination(
             periheral_waddr_out.write(addressM);
             periheral_wdata_out.write(outM);
             write_out = 0;
-        } else {
-            ram[addressM] = outM;
-            write_out = 1;
         }
+        ram[addressM] = outM;
+        write_out = 1;
     } else {
         write_out = 0;
     }
@@ -141,24 +140,6 @@ static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
 static word_t break_condition_bitmap = 0; // BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN; // obsolete
 static uint64_t break_cycle_interval = 0;
 
-#if 0
-static void disp_out_or_key_in_check(
-	ap_uint<1> write_out, addr_t addressM, word_t break_condition_bitmap,
-	bool mem_access, word_t& break_reason
-) {
-	if (break_condition_bitmap & BREAK_CONDITION_BIT_DISPOUT) {
-		if (write_out && (addressM >= 0x4000)) {
-			break_reason = BREAK_REASON_DISP;
-		}
-	}
-	if (mem_access && (break_condition_bitmap & BREAK_CONDITION_BIT_KEYIN)) {
-		if (addressM == 0x6000) {
-			break_reason = BREAK_REASON_KEYIN;
-		}
-	}
-}
-#endif 
-
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
 //       Separate M load 
@@ -178,8 +159,8 @@ word_t cpu(
 	#pragma HLS INTERFACE axis port=interrupt_in depth=4
 	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=4
 	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=4
-	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=128
-	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=128
+	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=4
+	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=4
 
 	word_t break_reason = BREAK_REASON_CYCLE;
     if (reset) {
@@ -312,12 +293,12 @@ void cpu_wrapper(
 	#pragma HLS INTERFACE axis port=interrupt_in depth=4
 	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=4
 	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=4
-	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=128
-	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=128
+	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=4
+	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=4
     //#pragma HLS INTERFACE ap_fifo port=debug 
 
-	#pragma HLS INTERFACE axis port=command_packet_in depth=32
-	#pragma HLS INTERFACE axis port=command_packet_out depth=32
+	#pragma HLS INTERFACE axis port=command_packet_in depth=4
+	#pragma HLS INTERFACE axis port=command_packet_out depth=4
 	//#pragma HLS INTERFACE ap_fifo port=debug
 
 	// Internal ROM

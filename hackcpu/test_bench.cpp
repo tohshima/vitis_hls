@@ -11,8 +11,10 @@
 #include "revasm.hpp"
 #include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
 #ifndef SIM_CPU_WRAPPER
-#if defined(USE_HACKCPU_UART) || defined(SIM_TASKS)
+#ifdef USE_HACKCPU_UART
 #include "hackcpu_uart.hpp"
+#elif SIM_TASKS
+#include "start_tasks.hpp"
 #else
 #include "uart_if.hpp"
 #include "uart_in_task.hpp"
@@ -147,9 +149,9 @@ static void read_rom_file(
 int main() {
 
 	hls_thread_local hls::stream<token_word_t> uart_in;
-    #pragma HLS STREAM variable=uart_in depth=32
+    #pragma HLS STREAM variable=uart_in depth=16
 	hls_thread_local hls::stream<char> uart_out;
-    #pragma HLS STREAM variable=uart_out depth=128
+    #pragma HLS STREAM variable=uart_out depth=4
 	
     start_tasks(uart_in, uart_out);
 
@@ -162,11 +164,12 @@ int main() {
     get_status(uart_out);
 
     read_rom_file("rom_pong.bin", uart_in, uart_out);
-
+#if 1
     send_token(NORMAL_OPERATION, uart_in);
     
     char rbuf[128];
     while (receive_line(rbuf, uart_out) <= 9000) {}
+#endif
     return 0;
 }
 

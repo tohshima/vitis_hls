@@ -38,7 +38,7 @@ static int make_disp_out(
 	word_t dataM,
 	hls::stream<char>& uart_out
 ) {
-	#pragma HLS INTERFACE axis port=uart_out depth=128
+	#pragma HLS INTERFACE axis port=uart_out depth=4
 
 	static word_t last_data_ = 0;
 	static addr_t last_addr_ = 0;
@@ -104,9 +104,9 @@ void uart_out_task(
 	hls::stream<char>& uart_out
 ) {
 	#pragma HLS INTERFACE axis port=command_out depth=32
-	#pragma HLS INTERFACE axis port=dispadr_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_out depth=128
-	#pragma HLS INTERFACE axis port=uart_out depth=128
+	#pragma HLS INTERFACE axis port=dispadr_out depth=4
+	#pragma HLS INTERFACE axis port=dispdat_out depth=4
+	#pragma HLS INTERFACE axis port=uart_out depth=4
 
 	if (!command_out.empty()) {
 		debug_phase_uot_ = 0xD0;
