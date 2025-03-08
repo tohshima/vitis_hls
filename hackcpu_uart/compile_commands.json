@@ -79,6 +79,18 @@
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
       "",
       "-c",
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
+    ],
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
+  },
+  {
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_uart",
+    "arguments": [
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
+      "-fhls",
+      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
+      "",
+      "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/comp_task.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/comp_task.cpp"
