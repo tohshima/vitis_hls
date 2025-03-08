@@ -1,3 +1,41 @@
+#ifndef UART_COMM_HPP
+#define UART_COMM_HPP
+
+#if 1 // linux
+
+#include <string>
+
+#define UART_COMM_EOF (0x1A)
+
+class uart_comm {
+private:
+    int fd; // ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿
+
+public:
+    uart_comm(const char* portName);
+    ~uart_comm();
+    bool write_data(const char* data, size_t length);
+    bool read_data(char* buffer, size_t buffer_size, size_t& bytes_read);
+};
+
+#ifdef UART_COMM_TEST
+#include <iostream>
+#if 0
+int main() {
+    uart_comm uart("/dev/ttyUSB0"); // Linuxã§ã¯ãƒ‡ãƒã‚¤ã‚¹ãƒ‘ã‚¹ãŒç•°ãªã‚Šã¾ã™
+    char buffer[256];
+    size_t bytesRead;
+    
+    if (uart.read_data(buffer, sizeof(buffer), bytesRead)) {
+        buffer[bytesRead] = '\0';  // Null-terminate the string
+        std::cout << "Received: " << buffer << std::endl;
+    }
+    return 0;
+}
+#endif
+#endif
+
+#else // windows
 #include <windows.h>
 #include <iostream>
 #include <string>
@@ -18,15 +56,15 @@ public:
 
 #if 0
 int main() {
-    uart_comm uart_comm("\\\\.\\COM3");  // COM3ƒ|[ƒg‚ğŠJ‚­
+    uart_comm uart_comm("\\\\.\\COM3");  // COM3ï¿½|ï¿½[ï¿½gï¿½ï¿½ï¿½Jï¿½ï¿½
 
-    // ƒf[ƒ^‘—M
+    // ï¿½fï¿½[ï¿½^ï¿½ï¿½ï¿½M
     const char* message = "Hello, Serial Port!";
     if (uart_comm.write_data(message, strlen(message))) {
         std::cout << "Data sent successfully\n";
     }
 
-    // ƒf[ƒ^óM
+    // ï¿½fï¿½[ï¿½^ï¿½ï¿½M
     char buffer[256];
     DWORD bytesRead;
     if (uart_comm.read_data(buffer, sizeof(buffer), bytesRead)) {
@@ -37,3 +75,5 @@ int main() {
     return 0;
 }
 #endif
+#endif
+#endif // UART_COMM_HPP

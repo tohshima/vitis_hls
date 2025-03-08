@@ -6,8 +6,10 @@
 #endif
 
 #ifndef __SYNTHESIS__
-#define USE_COM "COM2"
-uart_comm uart_comm("\\\\.\\" USE_COM);  // COM2ポートを開く
+//#define USE_COM "COM2"
+//uart_comm uart_comm("\\\\.\\" USE_COM);  // ポートを開く
+#define USE_COM "/dev/pts/2" // get a virrtual com port byS: socat -d -d pty,raw,echo=0 pty,raw,echo=0
+uart_comm uart_comm(USE_COM);  // ポートを開く
 #endif
 
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
@@ -17,7 +19,7 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 
 #ifndef __SYNTHESIS__
 	char uo[128];
-	DWORD length = 0;
+	size_t length = 0;
 	for (int i = 0; i < sizeof(uo); i++) {
 		if (uart_out.empty()) break;
 		uo[i] = uart_out.read();
@@ -58,7 +60,7 @@ static bool get_token(
 
 #ifndef __SYNTHESIS__
     char read_buf[1];
-    DWORD bytes_read = 0;
+    size_t bytes_read = 0;
 	while ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
 						(bytes_read == sizeof(read_buf))) {
 		debug_rx_data_ = read_buf[0];
