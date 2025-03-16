@@ -25,12 +25,12 @@ static word_t make_hex_bin(uint32_t hex_chars4) {
 void uart_in_task(
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<word_t>& command_in,
-	hls::stream<word_t>& key_in,
+	hls::stream<word_t>& ext_key_in,
 	hls::stream<word_t>& ext_interrupt_in
 ) {
 	#pragma HLS INTERFACE axis port=uart_in depth=4
 	#pragma HLS INTERFACE axis port=command_in depth=32
-	#pragma HLS INTERFACE axis port=key_in depth=4
+	#pragma HLS INTERFACE axis port=ext_key_in depth=4
 	#pragma HLS INTERFACE axis port=ext_interrupt_in depth=4
 
 	static word_t read_data[16];
@@ -44,7 +44,8 @@ void uart_in_task(
             // key input
 			debug_phase_uit_ = 0xB1;
 			word_t key_code = (((token >> 8)&0xFF)-'0')*100+(((token >> 16)&0xFF)-'0')*10+(((token >> 24)&0xFF)-'0'); // ToDo: conversion is not general
-			key_in.write(key_code);
+            ext_key_in.write_nb(key_code);
+                //std::cerr << "Sent " << key_code << std::endl;
 		} else if (token0 == 'I') {
             // interrupt
 			debug_phase_uit_ = 0xB2;

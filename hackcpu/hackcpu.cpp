@@ -41,24 +41,22 @@ static void compM(
     word_t A, 
     word_t D, 
     word_t ram[IRAM_SIZE],
-    word_t &alu_out,
-    hls::stream<addr_t>& periheral_raddr_out,
-    hls::stream<word_t>& periheral_rdata_in
+    hls::stream<addr_t>& peripheral_raddr_out,
+    hls::stream<word_t>& peripheral_rdata_in,
+    word_t &alu_out
 ) {
-	#pragma HLS INTERFACE axis port=periheral_raddr_out depth=4
-	#pragma HLS INTERFACE axis port=periheral_rdata_in depth=4
     #pragma HLS inline
     
     word_t x = D;
-    if (A >= PERIPHERAL_KEYIN_ADDR) {
-        // Input from peripheral modules, mainly used for a key input in the current design.
-        periheral_raddr_out.write(A);
-        word_t y = periheral_rdata_in.read();
-        comp_core(instruction, x, y, alu_out);
+    word_t y = 0;
+    if (A==PERIPHERAL_KEYIN_ADDR) {
+        // key in 
+        peripheral_raddr_out.write(A);
+        y = peripheral_rdata_in.read();
     } else {
-        word_t y = ram[A];
-        comp_core(instruction, x, y, alu_out);
+        y = ram[A];
     }
+    comp_core(instruction, x, y, alu_out);
 }
 
 static void get_destination(
@@ -157,10 +155,10 @@ word_t cpu(
     #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
     #pragma HLS INTERFACE ap_none port=reset
 	#pragma HLS INTERFACE axis port=interrupt_in depth=4
-	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=4
-	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=4
-	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=4
-	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=4
+	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=1
+	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=1
+	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=1
+	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=1
 
 	word_t break_reason = BREAK_REASON_CYCLE;
     if (reset) {
@@ -177,6 +175,7 @@ word_t cpu(
             #else
             #pragma HLS PIPELINE II=2
             #endif
+            //#pragma HLS DATAFLOW
 
             //if (cycle == cycle_to_stop) break;
             pc_of_cycle_start = Regs.PC;
@@ -226,13 +225,13 @@ word_t cpu(
 #endif
 #if defined(PIPELINE_II_1) && defined(REDUCE_CINST_CYCLE)
                     // ALU computation using M
-                    compM(instruction, Regs.A, Regs.D, d_ram, alu_out, peripheral_raddr_out, peripheral_rdata_in);
+                    compM(instruction, Regs.A, Regs.D, d_ram, key_in, alu_out);
 #else
                     // ALU computation using 
                     if (instruction[12] == 0) {
                         comp(instruction, Regs.A, Regs.D, alu_out);
                     } else {
-                        compM(instruction, Regs.A, Regs.D, d_ram, alu_out, peripheral_raddr_out, peripheral_rdata_in);
+                        compM(instruction, Regs.A, Regs.D, d_ram, peripheral_raddr_out, peripheral_rdata_in, alu_out);
                     }
 #endif
                     cinst_phase = 1;
@@ -291,15 +290,11 @@ void cpu_wrapper(
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
 	#pragma HLS INTERFACE axis port=interrupt_in depth=4
-	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=4
-	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=4
-	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=4
-	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=4
+	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=1
+	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=1
+	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=1
+	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=1
     //#pragma HLS INTERFACE ap_fifo port=debug 
-
-	#pragma HLS INTERFACE axis port=command_packet_in depth=4
-	#pragma HLS INTERFACE axis port=command_packet_out depth=4
-	//#pragma HLS INTERFACE ap_fifo port=debug
 
 	// Internal ROM
 	static word_t i_ram[IRAM_SIZE];
@@ -449,7 +444,11 @@ void cpu_wrapper(
 					(break_reason == BREAK_REASON_CYCLE)) {
 				break_reason = BREAK_REASON_INTERVAL;
 			}
-			if (!reset) SEND_NUM_RETVALS(0);
+            if (reset) {
+                for (int i = 0; i < sizeof(d_ram)/sizeof(word_t); i++) d_ram[i] = 0;
+            } else {
+                SEND_NUM_RETVALS(0);
+            }
 			halt = 1;
 		}
 		SEND_STATUS(break_reason);

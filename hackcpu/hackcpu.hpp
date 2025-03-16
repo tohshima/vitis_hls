@@ -11,7 +11,7 @@
 //#define AINST_DUAL_ISSUE
 
 #ifndef AINST_DUAL_ISSUE
-#define PIPELINE_II_1
+//#define PIPELINE_II_1
 //#define REDUCE_CINST_CYCLE // not work
 #endif
 
@@ -114,6 +114,7 @@ typedef struct {
 
 typedef ap_uint<8*TOKEN_SIZE> token_word_t;
 
+// peripheral
 #define PERIPHERAL_START_ADDR   (0x4000)
 #define PERIPHERAL_DISPMEM_ADDR (PERIPHERAL_START_ADDR)
 #define PERIPHERAL_DISPMEM_SIZE (0x2000)

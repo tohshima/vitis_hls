@@ -11,6 +11,8 @@ void uart_out_task(
 	hls::stream<word_t>& command_out,
 	hls::stream<addr_t>& dispadr_out,
 	hls::stream<word_t>& dispdat_out,
-	hls::stream<char>& uart_out
+	hls::stream<char>& uart_out,
+    hls::stream<ap_uint<1> >& dispflush_req,
+    hls::stream<ap_uint<1> >& dispflush_ack
 );
 #endif // #ifndef __UART_OUT_TASK_HPP__

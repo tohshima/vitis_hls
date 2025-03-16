@@ -8,14 +8,14 @@
 #ifndef __SYNTHESIS__
 //#define USE_COM "COM2"
 //uart_comm uart_comm("\\\\.\\" USE_COM);  // ポートを開く
-#define USE_COM "/dev/pts/2" // get a virrtual com port byS: socat -d -d pty,raw,echo=0 pty,raw,echo=0
+#define USE_COM "/tmp/ttyV0" // get a virrtual com port byS: socat -d -d pty,raw,echo=0 pty,raw,echo=0
 uart_comm uart_comm(USE_COM);  // ポートを開く
 #endif
 
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
      // depthを正しく設定しないとCo-simがうまくいかない
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20
-	#pragma HLS INTERFACE axis port=uart_out depth=128
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16
+	#pragma HLS INTERFACE axis port=uart_out depth=4
 
 #ifndef __SYNTHESIS__
 	char uo[128];
@@ -50,8 +50,8 @@ static bool get_token(
     volatile bool& sim_exit
 ) {
     // depthを正しく設定しないとCo-simがうまくいかない
-	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 
-	#pragma HLS INTERFACE axis port=uart_in depth=32
+	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16 
+	#pragma HLS INTERFACE axis port=uart_in depth=4
 
     static char debug_rx_data_ = 0;
 	static int char_index = 0;
@@ -90,9 +90,9 @@ void uart_if(
 	hls::stream<char>& uart_out,
     bool& sim_exit
 ) {
-    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
+    #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16 // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE axis port=uart_in depth=32
-	#pragma HLS INTERFACE axis port=uart_out depth=128
+	#pragma HLS INTERFACE axis port=uart_out depth=4
     #pragma HLS INTERFACE ap_none port=return
 
     static bool initialized = false;
