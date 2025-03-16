@@ -128,7 +128,7 @@ void uart_out_task(
 		word_t ret_status = command_out.read();
 		make_hex_chars(ret_status, uart_out);
 	} else if (!dispflush_req.empty()) {
-        if (uart_out.empty()) {
+        if (uart_out.size() == 0) { // all uart out completed.
             dispflush_req.read();
             dispflush_ack.write(1);
         }
