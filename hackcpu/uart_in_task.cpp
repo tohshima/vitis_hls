@@ -30,8 +30,8 @@ void uart_in_task(
 ) {
 	#pragma HLS INTERFACE axis port=uart_in depth=4
 	#pragma HLS INTERFACE axis port=command_in depth=32
-	#pragma HLS INTERFACE axis port=ext_key_in depth=4
-	#pragma HLS INTERFACE axis port=ext_interrupt_in depth=4
+	#pragma HLS INTERFACE axis port=ext_key_in depth=1
+	#pragma HLS INTERFACE axis port=ext_interrupt_in depth=1
 
 	static word_t read_data[16];
 	#pragma HLS BIND_STORAGE variable=read_data type=RAM_T2P impl=BRAM

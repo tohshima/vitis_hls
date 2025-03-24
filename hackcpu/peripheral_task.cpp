@@ -58,6 +58,7 @@ void peripheral_read_task(
 void peripheral_task(
 	hls::stream<word_t>& ext_interrupt_in,
     hls::stream<word_t>& interrupt_in,
+    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<word_t>& ext_key_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
@@ -68,15 +69,15 @@ void peripheral_task(
     hls::stream<ap_uint<1> >& dispflush_req,
     hls::stream<ap_uint<1> >& dispflush_ack
 ) {
-	#pragma HLS INTERFACE axis port=ext_interrupt_in depth=4
-	#pragma HLS INTERFACE axis port=interrupt_in depth=4
-	#pragma HLS INTERFACE axis port=ext_key_in depth=4
+	#pragma HLS INTERFACE axis port=ext_interrupt_in depth=1
+	#pragma HLS INTERFACE axis port=interrupt_in depth=1
+	#pragma HLS INTERFACE axis port=ext_key_in depth=2
 	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=1
 	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=1
 	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=1
 	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=1
-	#pragma HLS INTERFACE axis port=dispadr_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_out depth=128
+	#pragma HLS INTERFACE axis port=dispadr_out depth=1
+	#pragma HLS INTERFACE axis port=dispdat_out depth=1
 	#pragma HLS INTERFACE axis port=dispflush_req depth=1
 	#pragma HLS INTERFACE axis port=dispflush_ack depth=1
 
@@ -85,9 +86,10 @@ void peripheral_task(
         interrupt_in.write(ext_interrupt_in.read()); // ToDo: various interrupt should be handled in future
     }
     // Key-in
+    #if 0
     if (!peripheral_raddr_out.empty()) {
-        dispflush_req.write(1);
-        dispflush_ack.read(); // sync with uart out
+        //dispflush_req.write(1);
+        //dispflush_ack.read(); // sync with uart out
         static word_t key_code = 0;
         addr_t raddr = peripheral_raddr_out.read();
         if (raddr == PERIPHERAL_KEYIN_ADDR) {
@@ -98,8 +100,14 @@ void peripheral_task(
             peripheral_rdata_in.write(0xDEAD);
         }
     }
+    #else
+    if (!ext_key_in.empty()) {
+        word_t keyin = ext_key_in.read();
+        peripheral_mem[0] = keyin;
+    } 
+    #endif
     // Write access to peripheral from the cpu
-    else if (!peripheral_waddr_out.empty()) {
+    if (!peripheral_waddr_out.empty()) {
         addr_t waddr = peripheral_waddr_out.read();
         word_t wdata = peripheral_wdata_out.read();
         if ((waddr >= PERIPHERAL_DISPMEM_ADDR) && (waddr < (PERIPHERAL_DISPMEM_ADDR+PERIPHERAL_DISPMEM_SIZE))) {

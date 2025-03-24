@@ -2,6 +2,7 @@
 #include <hls_task.h>
 #include <hls_stream.h>
 #include "hackcpu.hpp"
+#include "peripheral_task.hpp"
 
 static void comp_core(word_t instruction, word_t x, word_t y, word_t &alu_out) {
     switch (instruction(11, 6)) {
@@ -41,6 +42,7 @@ static void compM(
     word_t A, 
     word_t D, 
     word_t ram[IRAM_SIZE],
+    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
     word_t &alu_out
@@ -51,8 +53,9 @@ static void compM(
     word_t y = 0;
     if (A==PERIPHERAL_KEYIN_ADDR) {
         // key in 
-        peripheral_raddr_out.write(A);
-        y = peripheral_rdata_in.read();
+        //peripheral_raddr_out.write(A);
+        //y = peripheral_rdata_in.read();
+        y = peripheral_mem[A-PERIPHERAL_KEYIN_ADDR];
     } else {
         y = ram[A];
     }
@@ -146,6 +149,7 @@ word_t cpu(
 	word_t d_ram[DRAM_SIZE],
 	ap_uint<1>& reset,
     hls::stream<word_t>& interrupt_in,
+    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
     hls::stream<addr_t>& peripheral_waddr_out,
@@ -154,7 +158,7 @@ word_t cpu(
     #pragma HLS INTERFACE ap_memory port=i_ram storage_type=ram_2p
     #pragma HLS INTERFACE ap_memory port=d_ram storage_type=ram_t2p
     #pragma HLS INTERFACE ap_none port=reset
-	#pragma HLS INTERFACE axis port=interrupt_in depth=4
+	#pragma HLS INTERFACE axis port=interrupt_in depth=1
 	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=1
 	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=1
 	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=1
@@ -231,7 +235,7 @@ word_t cpu(
                     if (instruction[12] == 0) {
                         comp(instruction, Regs.A, Regs.D, alu_out);
                     } else {
-                        compM(instruction, Regs.A, Regs.D, d_ram, peripheral_raddr_out, peripheral_rdata_in, alu_out);
+                        compM(instruction, Regs.A, Regs.D, d_ram, peripheral_mem, peripheral_raddr_out, peripheral_rdata_in, alu_out);
                     }
 #endif
                     cinst_phase = 1;
@@ -282,6 +286,7 @@ void cpu_wrapper(
 	hls::stream<word_t>& command_packet_in,
     hls::stream<word_t>& command_packet_out,
     hls::stream<word_t>& interrupt_in,
+    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
     hls::stream<addr_t>& peripheral_waddr_out,
@@ -289,7 +294,7 @@ void cpu_wrapper(
 ) {
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
-	#pragma HLS INTERFACE axis port=interrupt_in depth=4
+	#pragma HLS INTERFACE axis port=interrupt_in depth=1
 	#pragma HLS INTERFACE axis port=peripheral_raddr_out depth=1
 	#pragma HLS INTERFACE axis port=peripheral_rdata_in depth=1
 	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=1
@@ -439,7 +444,7 @@ void cpu_wrapper(
 		}
 		word_t break_reason = BREAK_REASON_NOP;
 		if (reset || !halt) {
-			break_reason = cpu(i_ram, d_ram, reset, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
+			break_reason = cpu(i_ram, d_ram, reset, interrupt_in, peripheral_mem, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 			if ((break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) &&
 					(break_reason == BREAK_REASON_CYCLE)) {
 				break_reason = BREAK_REASON_INTERVAL;

@@ -5,7 +5,7 @@
 #include "../common/uart_comm.hpp"
 #endif
 
-#ifndef __SYNTHESIS__
+#if !defined(__SYNTHESIS__)
 //#define USE_COM "COM2"
 //uart_comm uart_comm("\\\\.\\" USE_COM);  // ポートを開く
 #define USE_COM "/tmp/ttyV0" // get a virrtual com port byS: socat -d -d pty,raw,echo=0 pty,raw,echo=0
@@ -15,10 +15,10 @@ uart_comm uart_comm(USE_COM);  // ポートを開く
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
      // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16
-	#pragma HLS INTERFACE axis port=uart_out depth=4
+	#pragma HLS INTERFACE axis port=uart_out depth=1
 
-#ifndef __SYNTHESIS__
-	char uo[128];
+#if !defined(__SYNTHESIS__)
+	char uo[2048];
 	size_t length = 0;
 	for (int i = 0; i < sizeof(uo); i++) {
 		if (uart_out.empty()) break;
@@ -58,7 +58,7 @@ static bool get_token(
 	static ap_uint<8*TOKEN_SIZE> token = 0;
 	static bool key_in_flag = false;
 
-#ifndef __SYNTHESIS__
+#if !defined(__SYNTHESIS__) 
     char read_buf[1];
     size_t bytes_read = 0;
 	while ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&

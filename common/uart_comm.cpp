@@ -29,7 +29,7 @@ uart_comm::uart_comm(const char* portName) {
     }
     
     // ボーレートを設定
-    speed_t baud = B115200; 
+    speed_t baud = B4000000; 
     cfsetispeed(&options, baud);
     cfsetospeed(&options, baud);
     
@@ -127,7 +127,7 @@ uart_comm::uart_comm(const char* portName) {
         return;
     }
 
-    dcbSerialParams.BaudRate = CBR_115200; //CBR_115200;
+    dcbSerialParams.BaudRate = CBR_1152000; //CBR_115200;
     dcbSerialParams.ByteSize = 8;
     dcbSerialParams.StopBits = ONESTOPBIT;
     dcbSerialParams.Parity = NOPARITY;

@@ -11,6 +11,7 @@ void comp_task(
 	hls::stream<word_t>& command_in,
 	hls::stream<word_t>& command_out,
     hls::stream<word_t>& interrupt_in,
+    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
     hls::stream<addr_t>& peripheral_waddr_out,

@@ -106,13 +106,18 @@ void uart_out_task(
     hls::stream<ap_uint<1> >& dispflush_ack
 ) {
 	#pragma HLS INTERFACE axis port=command_out depth=32
-	#pragma HLS INTERFACE axis port=dispadr_out depth=128
-	#pragma HLS INTERFACE axis port=dispdat_out depth=128
-	#pragma HLS INTERFACE axis port=uart_out depth=128
+	#pragma HLS INTERFACE axis port=dispadr_out depth=1
+	#pragma HLS INTERFACE axis port=dispdat_out depth=1
+	#pragma HLS INTERFACE axis port=uart_out depth=1
 	#pragma HLS INTERFACE axis port=dispflush_req depth=1
 	#pragma HLS INTERFACE axis port=dispflush_ack depth=1
 
-	if (!command_out.empty()) {
+	if (!dispadr_out.empty()) {
+		debug_phase_uot_ = 0xDD;
+		word_t addrM = dispadr_out.read();
+		word_t dataM = dispdat_out.read();
+		make_disp_out(addrM, dataM, uart_out);
+	} else if (!command_out.empty()) {
 		debug_phase_uot_ = 0xD0;
 
 		word_t num_ret = command_out.read();
@@ -127,15 +132,10 @@ void uart_out_task(
 		debug_phase_uot_ = 0xD3;
 		word_t ret_status = command_out.read();
 		make_hex_chars(ret_status, uart_out);
-	} else if (!dispflush_req.empty()) {
+	} /*else if (!dispflush_req.empty()) {
         if (uart_out.size() == 0) { // all uart out completed.
             dispflush_req.read();
             dispflush_ack.write(1);
         }
-    } else if (!dispadr_out.empty()) {
-		debug_phase_uot_ = 0xDD;
-		word_t addrM = dispadr_out.read();
-		word_t dataM = dispdat_out.read();
-		make_disp_out(addrM, dataM, uart_out);
-	}
+    }*/
 }

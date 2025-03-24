@@ -5,7 +5,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_tasks/start_tasks.cpp"
     ],
@@ -17,7 +17,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/start_tasks.cpp"
     ],
@@ -29,7 +29,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/peripheral_task.cpp"
     ],
@@ -41,7 +41,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_in_task.cpp"
     ],
@@ -53,7 +53,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu.cpp"
     ],
@@ -65,7 +65,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/comp_task.cpp"
     ],
@@ -77,7 +77,7 @@
       "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
       "-fhls",
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "",
+      "-DSIM_TASKS",
       "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_out_task.cpp"
     ],

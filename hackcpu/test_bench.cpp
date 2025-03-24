@@ -13,7 +13,7 @@
 #ifndef SIM_CPU_WRAPPER
 #ifdef USE_HACKCPU_UART
 #include "hackcpu_uart.hpp"
-#elif SIM_TASKS
+#elif defined(SIM_TASKS)
 #include "start_tasks.hpp"
 #else
 #include "uart_if.hpp"
