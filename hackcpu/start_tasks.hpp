@@ -8,7 +8,6 @@
 #include "hackcpu.hpp"
 
 void start_tasks(
-    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out
 );

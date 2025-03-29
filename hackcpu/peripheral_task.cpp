@@ -58,7 +58,6 @@ void peripheral_read_task(
 void peripheral_task(
 	hls::stream<word_t>& ext_interrupt_in,
     hls::stream<word_t>& interrupt_in,
-    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<word_t>& ext_key_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
@@ -81,31 +80,15 @@ void peripheral_task(
 	#pragma HLS INTERFACE axis port=dispflush_req depth=1
 	#pragma HLS INTERFACE axis port=dispflush_ack depth=1
 
-    // Interrupt
+    // Interrupt or key_in
     if (!ext_interrupt_in.empty()) {
         interrupt_in.write(ext_interrupt_in.read()); // ToDo: various interrupt should be handled in future
     }
     // Key-in
-    #if 0
-    if (!peripheral_raddr_out.empty()) {
-        //dispflush_req.write(1);
-        //dispflush_ack.read(); // sync with uart out
-        static word_t key_code = 0;
-        addr_t raddr = peripheral_raddr_out.read();
-        if (raddr == PERIPHERAL_KEYIN_ADDR) {
-            ext_key_in.read_nb(key_code);
-            peripheral_rdata_in.write(key_code);
-        } else {
-            // Send dummy data
-            peripheral_rdata_in.write(0xDEAD);
-        }
-    }
-    #else
     if (!ext_key_in.empty()) {
         word_t keyin = ext_key_in.read();
-        peripheral_mem[0] = keyin;
+        interrupt_in.write(INT_REASON_KEYIN | (keyin & 0xFF));
     } 
-    #endif
     // Write access to peripheral from the cpu
     if (!peripheral_waddr_out.empty()) {
         addr_t waddr = peripheral_waddr_out.read();

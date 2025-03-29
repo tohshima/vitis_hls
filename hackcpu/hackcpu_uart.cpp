@@ -16,10 +16,7 @@ int hackcpu_uart(
 	hls_thread_local hls::stream<char> uart_out;
     #pragma HLS STREAM variable=uart_out depth=128
 	
-    word_t peripheral_mem[PERIPHERAL_MEM_SIZE] = {0};
-    #pragma HLS BIND_STORAGE variable=peripheral_mem ty@e = RAM_T2P
-
-    start_tasks(peripheral_mem, uart_in, uart_out);
+    start_tasks(uart_in, uart_out);
 #ifndef SIM_TATSKS
     bool sim_exit = false;
 	for(;;) {

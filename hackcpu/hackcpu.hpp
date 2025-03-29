@@ -119,14 +119,18 @@ typedef ap_uint<8*TOKEN_SIZE> token_word_t;
 #define PERIPHERAL_DISPMEM_ADDR (PERIPHERAL_START_ADDR)
 #define PERIPHERAL_DISPMEM_SIZE (0x2000)
 #define PERIPHERAL_KEYIN_ADDR   (0x6000)
-#define PERIPHERAL_MEM_SIZE     (1)
+
+typedef enum {
+    INT_REASON_MASK = 0xF000,
+    INT_REASON_BREAK = 0x0000,
+    INT_REASON_KEYIN = 0x1000
+} int_reason_e;
 
 // declarations of top functions
 void cpu_wrapper(
     hls::stream<word_t>& command_packet_in,
     hls::stream<word_t>& command_packet_out,
     hls::stream<word_t>& interrupt_in,
-    word_t peripheral_mem[PERIPHERAL_MEM_SIZE],
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
     hls::stream<addr_t>& peripheral_waddr_out,
