@@ -1,0 +1,11 @@
+{
+  "name": "hackcpu_tasks",
+  "type": "HLS",
+  "configuration": {
+    "componentType": "HLS",
+    "configFiles": [
+      "hls_config_hackcpu_tasks.cfg"
+    ],
+    "work_dir": "start_tasks"
+  }
+}

@@ -1,6 +1,8 @@
 # Ignore build output directory
 /build
 /export
+/hackcpu_uart
+/_ide
 
 # Ignore object files and dependent files
 .o
@@ -18,6 +20,4 @@
 .peers.ini
 .repo.yaml
 .vitisWorkspace.json
-.theia
-.wsdata
-
+.cache
