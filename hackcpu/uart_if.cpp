@@ -12,6 +12,25 @@
 uart_comm uart_comm(USE_COM);  // ポートを開く
 #endif
 
+#if defined(__SYNTHESIS__)
+static bool is_not_tx_fifo_full(volatile unsigned int *uart_reg) {
+#ifdef USE_ZYNQ_PS_UART
+    return (uart_reg[XUARTPS_SR_OFFSET] & 0x00000010) == 0;
+#else
+    // UART lite IP
+    return (uart_reg[STAT_REG_OFFSET] & 0x00000008) == 0;
+#endif
+}
+static void write_to_tx_fifo(volatile unsigned int *uart_reg, char c) {
+#ifdef USE_ZYNQ_PS_UART
+    uart_reg[XUARTPS_FIFO_OFFSET] = c;
+#else
+    // UART lite IP
+    uart_reg[TX_FIFO_OFFSET] = c;
+#endif
+}
+#endif
+
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
      // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16
@@ -31,10 +50,9 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 #else
 	while (!uart_out.empty()) {
     	// TXFIFOが満杯でないか確認
-        if ((uart_reg[STAT_REG_OFFSET] & 0x00000008) == 0) {
+        if (is_not_tx_fifo_full(uart_reg)) {
             // データをTXFIFOに書き込む
-            uart_reg[TX_FIFO_OFFSET] = uart_out.read();
-
+            write_to_tx_fifo(uart_reg, uart_out.read());
         } else {
             // 満杯だったらいったん中断して次の回に
             break;
@@ -43,6 +61,25 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 #endif
 }
 
+
+#if defined(__SYNTHESIS__)
+static bool is_not_rx_fifo_empty(volatile unsigned int *uart_reg) {
+#ifdef USE_ZYNQ_PS_UART
+    return (uart_reg[XUARTPS_SR_OFFSET] & 0x00000002) == 0;
+#else
+    // UART lite IP
+    return (uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1;
+#endif
+}
+static char read_from_rx_fifo(volatile unsigned int *uart_reg) {
+#ifdef USE_ZYNQ_PS_UART
+    return uart_reg[XUARTPS_FIFO_OFFSET];
+#else
+    // UART lite IP
+    return uart_reg[RX_FIFO_OFFSET];
+#endif
+}
+#endif
 
 static bool get_token(
     volatile unsigned int *uart_reg,
@@ -65,8 +102,8 @@ static bool get_token(
 						(bytes_read == sizeof(read_buf))) {
 		debug_rx_data_ = read_buf[0];
 #else
-	if ((uart_reg[STAT_REG_OFFSET] & 0x00000001) == 1) {
-		debug_rx_data_ = uart_reg[RX_FIFO_OFFSET];
+	if (is_not_rx_fifo_empty(uart_reg)) {
+		debug_rx_data_ = read_from_rx_fifo(uart_reg);
 #endif
         if (debug_rx_data_ == 'X') {
             sim_exit = true;
@@ -103,10 +140,12 @@ void uart_if(
     sim_exit = false;
 	if (!initialized) {
 		initialized = true;
+        #ifndef USE_ZYNQ_PS_UART
+        // for UART lite IP
 		uart_reg[CTRL_REG_OFFSET] = 0x00000003;  // ソフトウェアリセット
 		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
 		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
-
+        #endif
 	} else {
 		//#pragma HLS DATAFLOW
 		//while (1) {

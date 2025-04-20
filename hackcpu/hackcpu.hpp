@@ -103,11 +103,18 @@ typedef struct {
 
 #define DUMMY_READ() {while(!command_out.empty()) {command_out.read();}}
 
+#ifdef USE_ZYNQ_PS_UART
+#define UART_REG_SIZE   0x10
+#define XUARTPS_SR_OFFSET   (0x2C/sizeof(int))
+#define XUARTPS_FIFO_OFFSET (0x30/sizeof(int))
+#else // USE_ZYNQ_PS_UART
 // UART Lite IP consts
+#define UART_REG_SIZE   0x4
 #define RX_FIFO_OFFSET  0x0
 #define TX_FIFO_OFFSET  0x1
 #define STAT_REG_OFFSET  0x2
 #define CTRL_REG_OFFSET  0x3
+#endif
 
 #define TOKEN_SIZE (4)
 #define OUT_CHAR_SIZE (108)

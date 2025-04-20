@@ -31,11 +31,11 @@
 int main() {
     #ifdef USE_HACKCPU_UART
 
-    unsigned int uart_reg[4] = {0};
+    unsigned int uart_reg[UART_REG_SIZE] = {0};
     return hackcpu_uart(uart_reg);
 
     #else
-    unsigned int uart_reg[4] = {0};
+    unsigned int uart_reg[UART_REG_SIZE] = {0};
 
 	static hls_thread_local hls::stream<token_word_t> uart_in;
 	static hls_thread_local hls::stream<char> uart_out;
