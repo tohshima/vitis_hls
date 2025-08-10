@@ -10,12 +10,12 @@ int hackcpu_uart(
 	unsigned int *uart_reg
     #ifdef USE_ZYNQ_PS_UART
     ,
-    bool start,
+    bool& start
     #endif
 ) {
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
     #ifdef USE_ZYNQ_PS_UART
-    #pragma HLS INTERFACE s_axillite register port=start
+    #pragma HLS INTERFACE s_axilite register port=start
     #endif
     #pragma HLS INTERFACE ap_ctrl_none port=return
 

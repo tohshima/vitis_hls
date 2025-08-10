@@ -7,5 +7,9 @@
 
 int hackcpu_uart(
 	unsigned int *uart_reg
+    #ifdef USE_ZYNQ_PS_UART
+    ,
+    bool& start
+    #endif
 );
 #endif // #ifndef __HACKCPU_UART_HPP__
