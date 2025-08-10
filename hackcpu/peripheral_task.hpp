@@ -3,7 +3,6 @@
 #define __PERIPHERAL_TASK_HPP__
 
 #include <ap_int.h>
-#include <hls_task.h>
 #include <hls_stream.h>
 #include "hackcpu.hpp"
 #if 0

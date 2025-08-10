@@ -37,7 +37,7 @@ void uart_in_task(
 	#pragma HLS BIND_STORAGE variable=read_data type=RAM_T2P impl=BRAM
 
 	debug_phase_uit_ = 0xB0;
-	//if (!uart_in.empty()) {
+	if (!uart_in.empty()) {
 		token_word_t token = uart_in.read();
         token_word_t token0 = token & 0xFF;
 		if (token0 == 'K') {
@@ -57,6 +57,6 @@ void uart_in_task(
 			debug_command_ = command;
 			command_in.write(command);
 		}
-	//}
+	}
 }
 

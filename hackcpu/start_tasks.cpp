@@ -1,4 +1,6 @@
 // HACKCPU starttask module
+#include <hls_task.h>
+
 #include "hackcpu.hpp"
 #include "uart_if.hpp"
 #include "uart_in_task.hpp"

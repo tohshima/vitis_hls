@@ -8,7 +8,7 @@
 #if !defined(__SYNTHESIS__)
 //#define USE_COM "COM2"
 //uart_comm uart_comm("\\\\.\\" USE_COM);  // ポートを開く
-#define USE_COM "/tmp/ttyV0" // get a virrtual com port byS: socat -d -d pty,raw,echo=0 pty,raw,echo=0
+#define USE_COM "/tmp/ttyV0" // get a virrtual com port by: socat pty,raw,echo=0,link=/tmp/ttyV0 pty,raw,echo=0,link=/tmp/ttyV1
 uart_comm uart_comm(USE_COM);  // ポートを開く
 #endif
 
@@ -125,12 +125,18 @@ void uart_if(
 	unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
+    #ifdef USE_ZYNQ_PS_UART
+    bool start,
+    #endif
     bool& sim_exit
 ) {
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16 // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 	#pragma HLS INTERFACE axis port=uart_out depth=4
-    #pragma HLS INTERFACE ap_none port=return
+    #ifdef USE_ZYNQ_PS_UART
+    #pragma HLS INTERFACE s_axillite register port=start
+    #endif
+    #pragma HLS INTERFACE ap_ctrl_none port=return
 
     static bool initialized = false;
 
@@ -146,7 +152,11 @@ void uart_if(
 		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
 		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
         #endif
-	} else {
+	} else 
+    #ifdef USE_ZYNQ_PS_UART
+    if (start)
+    #endif
+    {
 		//#pragma HLS DATAFLOW
 		//while (1) {
 			get_token(uart_reg, uart_in, sim_exit);

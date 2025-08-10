@@ -115,18 +115,6 @@
       "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
       "-DUSE_HACKCPU_UART",
       "-c",
-      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/revasm.cpp"
-    ],
-    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/revasm.cpp"
-  },
-  {
-    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_uart",
-    "arguments": [
-      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
-      "-fhls-tb",
-      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
-      "-DUSE_HACKCPU_UART",
-      "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/common/uart_comm.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/common/uart_comm.cpp"

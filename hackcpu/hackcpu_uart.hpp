@@ -3,8 +3,6 @@
 #define __HACKCPU_UART_HPP__
 
 #include <ap_int.h>
-#include <hls_task.h>
-#include <hls_stream.h>
 #include "hackcpu.hpp"
 
 int hackcpu_uart(

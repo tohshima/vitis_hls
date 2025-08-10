@@ -1,7 +1,8 @@
 // Computation task module for hackcpu
+#include <hls_task.h>
+
 #include "hackcpu.hpp"
 #include "comp_task.hpp"
-#include <hls_task.h>
 
 void peripheral_key_in_task(
     hls::stream<word_t>& ext_key_in,

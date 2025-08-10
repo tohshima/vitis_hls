@@ -11,7 +11,7 @@
 //#define AINST_DUAL_ISSUE
 
 #ifndef AINST_DUAL_ISSUE
-//#define PIPELINE_II_1
+#define PIPELINE_II_1
 //#define REDUCE_CINST_CYCLE // not work
 #endif
 

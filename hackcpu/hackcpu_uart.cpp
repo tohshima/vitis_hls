@@ -1,4 +1,6 @@
 // HACKCPU UART IF top module
+#include <hls_task.h>
+
 #include "hackcpu.hpp"
 #include "start_tasks.hpp"
 #include "uart_if.hpp"
@@ -6,9 +8,16 @@
 
 int hackcpu_uart(
 	unsigned int *uart_reg
+    #ifdef USE_ZYNQ_PS_UART
+    ,
+    bool start,
+    #endif
 ) {
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
-    #pragma HLS INTERFACE ap_none port=return
+    #ifdef USE_ZYNQ_PS_UART
+    #pragma HLS INTERFACE s_axillite register port=start
+    #endif
+    #pragma HLS INTERFACE ap_ctrl_none port=return
 
     #pragma HLS DATAFLOW
 	hls_thread_local hls::stream<token_word_t> uart_in;
@@ -21,7 +30,11 @@ int hackcpu_uart(
     bool sim_exit = false;
 	for(;;) {
         #pragma HLS PIPELINE
+        #ifdef USE_ZYNQ_PS_UART
+		uart_if(uart_reg, uart_in, uart_out, true, sim_exit);
+        #else
 		uart_if(uart_reg, uart_in, uart_out, sim_exit);
+        #endif
         if (sim_exit) return 0;
 	}
 #endif
