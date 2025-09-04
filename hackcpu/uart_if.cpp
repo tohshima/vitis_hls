@@ -122,22 +122,20 @@ static bool get_token(
 }
 
 void uart_if(
-	unsigned int *uart_reg,
+	volatile unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
-    #ifdef USE_ZYNQ_PS_UART
-    bool start,
-    #endif
-    bool& sim_exit
+    bool& sim_exit,
+    volatile ap_uint<8>& debug_phase
 ) {
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16 // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 	#pragma HLS INTERFACE axis port=uart_out depth=4
     #ifdef USE_ZYNQ_PS_UART
-    #pragma HLS INTERFACE s_axillite register port=start
-    #endif
+    #pragma HLS INTERFACE s_axilite port=return
+    #else
     #pragma HLS INTERFACE ap_ctrl_none port=return
-
+    #endif
     static bool initialized = false;
 
 	// ボーレート設定（例：115200 bps）
@@ -152,14 +150,12 @@ void uart_if(
 		uart_reg[CTRL_REG_OFFSET] = 0x00000000;  // リセット解除
 		uart_reg[CTRL_REG_OFFSET] = 0x00000010;  // RX割り込みを有効化
         #endif
-	} else 
-    #ifdef USE_ZYNQ_PS_UART
-    if (start)
-    #endif
-    {
+	} else {
 		//#pragma HLS DATAFLOW
 		//while (1) {
+            debug_phase = 0x20;
 			get_token(uart_reg, uart_in, sim_exit);
+            debug_phase = 0x22;
 			send_chars(uart_reg, uart_out);
 		//}
     }

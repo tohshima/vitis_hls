@@ -133,8 +133,17 @@ typedef enum {
     INT_REASON_KEYIN = 0x1000
 } int_reason_e;
 
+#ifdef USE_PYNQ_BUTTON
+#define PYNQ_BUTTON_CODE_LEFT   ('K' | ('1' << 8) | ('3' << 16) | ('0' << 24))
+#define PYNQ_BUTTON_CODE_RIGHT  ('K' | ('1' << 8) | ('3' << 16) | ('2' << 24))
+#define PYNQ_BUTTON_CODE_NONE   ('K' | ('0' << 8) | ('0' << 16) | ('0' << 24))
+#endif
+
 // declarations of top functions
 void cpu_wrapper(
+    #ifdef USE_PYNQ_BUTTON
+	hls::stream< ap_uint<1> >& led_active,
+    #endif
     hls::stream<word_t>& command_packet_in,
     hls::stream<word_t>& command_packet_out,
     hls::stream<word_t>& interrupt_in,

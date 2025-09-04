@@ -278,6 +278,9 @@ static word_t bit_count(word_t bitmap) {
 }
 
 void cpu_wrapper(
+    #ifdef USE_PYNQ_BUTTON
+	hls::stream< ap_uint<1> >& led_active,
+    #endif
 	hls::stream<word_t>& command_packet_in,
     hls::stream<word_t>& command_packet_out,
     hls::stream<word_t>& interrupt_in,
@@ -286,6 +289,9 @@ void cpu_wrapper(
     hls::stream<addr_t>& peripheral_waddr_out,
     hls::stream<word_t>& peripheral_wdata_out
 ) {
+    #ifdef USE_PYNQ_BUTTON
+    #pragma HLS INTERFACE axis port=led_active depth=1
+    #endif
     #pragma HLS INTERFACE axis port=command_packet_in depth=32
     #pragma HLS INTERFACE axis port=command_packet_out depth=32
 	#pragma HLS INTERFACE axis port=interrupt_in depth=1
@@ -309,6 +315,9 @@ void cpu_wrapper(
 	//while (!command_packet_in.empty()) {
 		// feed a new command
 		control_command_e command = (control_command_e)command_packet_in.read().to_int();
+        #ifdef USE_PYNQ_BUTTON
+        led_active.write(1);
+        #endif
 		switch(command) {
 			case NORMAL_OPERATION:
 				cycle_to_stop =  (break_cycle_interval > 0)? cycle+break_cycle_interval:  0xFFFFFFFFFFFFFFFFull;
@@ -451,6 +460,9 @@ void cpu_wrapper(
 			halt = 1;
 		}
 		SEND_STATUS(break_reason);
+        #ifdef USE_PYNQ_BUTTON
+        led_active.write(0);
+        #endif
 	//}
 }
 

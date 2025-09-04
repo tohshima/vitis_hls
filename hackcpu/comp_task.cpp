@@ -12,6 +12,9 @@ void peripheral_key_in_task(
     d_ram[PERIPHERAL_KEYIN_ADDR] = ext_key_in.read();
 }
 void comp_task(
+    #ifdef USE_PYNQ_BUTTON
+	hls::stream< ap_uint<1> >& led_active,
+    #endif
 	hls::stream<word_t>& command_in,
 	hls::stream<word_t>& command_out,
     hls::stream<word_t>& interrupt_in,
@@ -20,6 +23,9 @@ void comp_task(
     hls::stream<addr_t>& peripheral_waddr_out,
     hls::stream<word_t>& peripheral_wdata_out
 ) {
+    #ifdef USE_PYNQ_BUTTON
+    #pragma HLS INTERFACE axis port=led_active depth=1
+    #endif
     #pragma HLS INTERFACE axis port=command_in depth=32
     #pragma HLS INTERFACE axis port=command_out depth=32
 	#pragma HLS INTERFACE axis port=interrupt_in depth=1
@@ -28,6 +34,10 @@ void comp_task(
 	#pragma HLS INTERFACE axis port=peripheral_waddr_out depth=1
 	#pragma HLS INTERFACE axis port=peripheral_wdata_out depth=1
 
-	cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
+	cpu_wrapper(
+        #ifdef USE_PYNQ_BUTTON
+        led_active,
+        #endif
+        command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 }
 

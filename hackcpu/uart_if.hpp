@@ -7,12 +7,10 @@
 #include "hackcpu.hpp"
 
 void uart_if(
-	unsigned int *uart_reg,
+	volatile unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
-    #ifdef USE_ZYNQ_PS_UART
-    bool start,
-    #endif
-    bool& sim_exit
+    bool& sim_exit,
+    volatile ap_uint<8>& debug_phase
 );
 #endif // #ifndef __UART_IF_HPP__

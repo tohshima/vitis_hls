@@ -10,10 +10,17 @@
 #include "start_tasks.hpp"
 
 void start_tasks(
+    #ifdef USE_PYNQ_BUTTON
+	hls::stream< ap_uint<1> >& led_active,
+    #endif
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out
 ) {
     #pragma HLS INLINE
+
+    #ifdef USE_PYNQ_BUTTON
+    #pragma HLS INTERFACE axis port=led_active depth=1
+    #endif
 
 	// CPU interface signals
     hls_thread_local hls::stream<word_t> command_in;
@@ -46,7 +53,11 @@ void start_tasks(
     #pragma HLS STREAM variable=dispflush_ack depth=1
 
 	hls_thread_local hls::task uit(uart_in_task, uart_in, command_in, ext_key_in, ext_interrupt_in);
-	hls_thread_local hls::task ct(comp_task, command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
+	hls_thread_local hls::task ct(comp_task, 
+        #ifdef USE_PYNQ_BUTTON
+        led_active,
+        #endif
+        command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 	hls_thread_local hls::task pt(peripheral_task, ext_interrupt_in, interrupt_in, ext_key_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, dispadr_out, dispdat_out, dispflush_req, dispflush_ack);
     //hls_thread_local hls::task itt(interrupt_in_task, ext_interrupt_in, interrupt_in);
     //hls_thread_local hls::task pwt(peripheral_write_task, peripheral_waddr_out, peripheral_wdata_out, dispadr_out, dispdat_out);

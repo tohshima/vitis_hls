@@ -7,6 +7,9 @@
 #include "hackcpu.hpp"
 
 void start_tasks(
+    #ifdef USE_PYNQ_BUTTON
+	hls::stream< ap_uint<1> >& led_active,
+    #endif
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out
 );
