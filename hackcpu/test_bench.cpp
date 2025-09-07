@@ -31,8 +31,30 @@
 int main() {
     #ifdef USE_HACKCPU_UART
 
+    #ifdef USE_ZYNQ_PS_UART
+    ap_uint<1> uart_start = 0;
+    #endif
+    #ifdef USE_PYNQ_BUTTON
+    volatile ap_uint<1> button_in0 = 0;
+    volatile ap_uint<1> button_in1 = 0;
+    volatile ap_uint<1> button_in2 = 0;
+    volatile ap_uint<1> button_in3 = 0;
+    volatile ap_uint<1> btn_smp_clk = 0;
+    volatile ap_uint<1> led_btn_L_out = 0;
+    volatile ap_uint<1> led_btn_R_out = 0;
+    volatile ap_uint<1> led_active_out = 0;
+    #endif
+    volatile ap_uint<8> debug_phase = 0;
     unsigned int uart_reg[UART_REG_SIZE] = {0};
-    return hackcpu_uart(uart_reg);
+    return hackcpu_uart(
+        #ifdef USE_ZYNQ_PS_UART
+        uart_start,
+        #endif
+        #ifdef USE_PYNQ_BUTTON
+        button_in0, button_in1, button_in2, button_in3,
+        btn_smp_clk, led_btn_L_out, led_btn_R_out, led_active_out,
+        #endif
+        uart_reg, debug_phase);
 
     #else
     unsigned int uart_reg[UART_REG_SIZE] = {0};
