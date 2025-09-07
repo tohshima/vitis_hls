@@ -13,3 +13,4 @@ static tRegs sRegs = {
 ap_uint<32> axireg_get_uart_enable(void) {
     return sRegs.uart_enable;
 }
+

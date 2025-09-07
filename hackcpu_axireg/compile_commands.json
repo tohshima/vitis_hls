@@ -79,18 +79,6 @@
       "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
       "-DUSE_ZYNQ_PS_UART -DUSE_PYNQ_BUTTON -DUSE_AXI_REGIF",
       "-c",
-      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
-    ],
-    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_uart.cpp"
-  },
-  {
-    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_axireg",
-    "arguments": [
-      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
-      "-fhls",
-      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
-      "-DUSE_ZYNQ_PS_UART -DUSE_PYNQ_BUTTON -DUSE_AXI_REGIF",
-      "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/comp_task.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/comp_task.cpp"
@@ -106,6 +94,18 @@
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_out_task.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/uart_out_task.cpp"
+  },
+  {
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_axireg",
+    "arguments": [
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
+      "-fhls",
+      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
+      "-DUSE_ZYNQ_PS_UART -DUSE_PYNQ_BUTTON -DUSE_AXI_REGIF",
+      "-c",
+      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_if.cpp"
+    ],
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/hackcpu_if.cpp"
   },
   {
     "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_axireg",
