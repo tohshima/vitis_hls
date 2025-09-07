@@ -1,0 +1,11 @@
+{
+  "name": "hackcpu_axireg",
+  "type": "HLS",
+  "configuration": {
+    "componentType": "HLS",
+    "configFiles": [
+      "hls_config_hackcpu_axireg.cfg"
+    ],
+    "work_dir": "hackcpu_axireg"
+  }
+}
