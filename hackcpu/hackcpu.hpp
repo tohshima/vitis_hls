@@ -134,8 +134,9 @@ typedef enum {
 } int_reason_e;
 
 #ifdef USE_PYNQ_BUTTON
-#define PYNQ_BUTTON_CODE_LEFT   ('K' | ('1' << 8) | ('3' << 16) | ('0' << 24))
-#define PYNQ_BUTTON_CODE_RIGHT  ('K' | ('1' << 8) | ('3' << 16) | ('2' << 24))
+#define PYNQ_BUTTON_CODE_CLEFT  ('K' | ('1' << 8) | ('3' << 16) | ('0' << 24))
+#define PYNQ_BUTTON_CODE_CRIGHT ('K' | ('1' << 8) | ('3' << 16) | ('2' << 24))
+#define PYNQ_BUTTON_CODE_RIGHT  ('I' | ('0' << 8) | ('0' << 16) | ('0' << 24))
 #define PYNQ_BUTTON_CODE_NONE   ('K' | ('0' << 8) | ('0' << 16) | ('0' << 24))
 #endif
 

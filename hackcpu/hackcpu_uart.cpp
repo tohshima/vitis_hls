@@ -45,37 +45,48 @@ static void check_buttons(
     volatile ap_uint<8>& debug_phase
 ) {
 #pragma HLS inline
-    static ap_uint<1> prev_clk = (ap_uint<1>)0;
-    static ap_uint<1> prev_btn1 = (ap_uint<1>)0;
-    static ap_uint<1> prev_btn2 = (ap_uint<1>)0;
+    static ap_uint<1> prev_clk = 0;
+    static ap_uint<1> prev_btn0 = 0;
+    static ap_uint<1> prev_btn1 = 0;
+    static ap_uint<1> prev_btn2 = 0;
     ap_uint<1> curr_clk = btn_smp_clk;
+    ap_uint<1> curr_btn0 = button_in0;
     ap_uint<1> curr_btn1 = button_in1;
     ap_uint<1> curr_btn2 = button_in2;
     debug_phase = 0x31;
 
     if (curr_clk != prev_clk) {
         prev_clk = btn_smp_clk;
-        // L button
+        // C-L button
         if (curr_btn2 != prev_btn2) {
             debug_phase = 0x32;
             prev_btn2 = curr_btn2;
             if (curr_btn2) {
                 debug_phase = 0x33;
-                uart_in.write(PYNQ_BUTTON_CODE_LEFT);
+                uart_in.write(PYNQ_BUTTON_CODE_CLEFT);
             } else {
                 uart_in.write(PYNQ_BUTTON_CODE_NONE);
             }        
         }
-        // R button
+        // C-R button
         if (curr_btn1 != prev_btn1) {
             debug_phase = 0x34;
             prev_btn1 = curr_btn1;
             if (curr_btn1) {
                 debug_phase = 0x35;
-                uart_in.write(PYNQ_BUTTON_CODE_RIGHT);
+                uart_in.write(PYNQ_BUTTON_CODE_CRIGHT);
             } else {
                 uart_in.write(PYNQ_BUTTON_CODE_NONE);
             }        
+        }
+        // R button
+        if (curr_btn0 != prev_btn0) {
+            debug_phase = 0x36;
+            prev_btn0 = curr_btn0;
+            if (curr_btn0) {
+                debug_phase = 0x37;
+                uart_in.write(PYNQ_BUTTON_CODE_RIGHT);
+            }      
         }
     }
     led_btn_L_out = curr_btn2;
@@ -85,7 +96,7 @@ static void check_buttons(
 
 int hackcpu_uart(
     #ifdef USE_ZYNQ_PS_UART
-    ap_uint<1> start,
+    ap_uint<1> uart_start,
     #endif
     #ifdef USE_PYNQ_BUTTON
     volatile ap_uint<1> button_in0,
@@ -101,7 +112,7 @@ int hackcpu_uart(
     volatile ap_uint<8>& debug_phase
 ) {
     #ifdef USE_ZYNQ_PS_UART
-    #pragma HLS INTERFACE s_axilite register port=start
+    #pragma HLS INTERFACE s_axilite register port=uart_start
     #endif
     #ifdef USE_PYNQ_BUTTON
     #pragma HLS INTERFACE ap_none port=button_in0    
@@ -138,17 +149,23 @@ int hackcpu_uart(
 
 #ifndef SIM_TATSKS
     bool sim_exit = false;
-    #ifdef USE_ZYNQ_PS_UART
-    if (start) {
-    #else
-	for(;;) {
-        #pragma HLS PIPELINE
+    #ifndef USE_ZYNQ_PS_UART
+	for(;;) 
     #endif
+    {
+        #pragma HLS PIPELINE
         debug_phase = 0x10;
-        uart_if(uart_reg, uart_in, uart_out, sim_exit, debug_phase);
+        #ifdef USE_ZYNQ_PS_UART
+        if (uart_start) 
+        #endif
+        {
+            uart_if(uart_reg, uart_in, uart_out, sim_exit, debug_phase);
+        }
+
         #ifdef USE_PYNQ_BUTTON
         debug_phase = 0x11;
         sync_led_active(btn_smp_clk, led_active_out, led_active);
+        
         debug_phase = 0x13;
         check_buttons(button_in0, button_in1, button_in2, button_in3, 
             btn_smp_clk, led_btn_L_out, led_btn_R_out, uart_in, debug_phase);
