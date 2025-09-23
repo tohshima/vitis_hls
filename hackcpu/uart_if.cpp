@@ -40,6 +40,7 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 	char uo[2048];
 	size_t length = 0;
 	for (int i = 0; i < sizeof(uo); i++) {
+        #pragma HLS DATAFLOW
 		if (uart_out.empty()) break;
 		uo[i] = uart_out.read();
 		length++;
@@ -49,6 +50,7 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 	}
 #else
 	while (!uart_out.empty()) {
+        #pragma HLS DATAFLOW
     	// TXFIFOが満杯でないか確認
         if (is_not_tx_fifo_full(uart_reg)) {
             // データをTXFIFOに書き込む
@@ -100,6 +102,7 @@ static bool get_token(
     size_t bytes_read = 0;
 	while ((uart_comm.read_data(read_buf, sizeof(read_buf), bytes_read)) &&
 						(bytes_read == sizeof(read_buf))) {
+        #pragma HLS DATAFLOW
 		debug_rx_data_ = read_buf[0];
 #else
 	if (is_not_rx_fifo_empty(uart_reg)) {
