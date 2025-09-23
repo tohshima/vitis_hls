@@ -7,11 +7,9 @@
 #include "hackcpu.hpp"
 
 void comp_task(
-    #ifdef USE_PYNQ_BUTTON
 	hls::stream< ap_uint<1> >& led_active,
-    #endif
-	hls::stream<word_t>& command_in,
-	hls::stream<word_t>& command_out,
+	hls::stream<command_t>& command_in,
+	hls::stream<command_t>& command_out,
     hls::stream<word_t>& interrupt_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,

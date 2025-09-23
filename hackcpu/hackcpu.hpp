@@ -21,6 +21,7 @@ const int ADDR_WIDTH = 15;
 const int IRAM_SIZE  = 1 << ADDR_WIDTH;
 const int DRAM_SIZE  = (1 << ADDR_WIDTH);
 const int TRARCE_SIZE = 32;
+const int TAG_WIDTH  = 4;
 
 // Debug instruction
 #define INST_FETCH_STOP 0x8000
@@ -42,6 +43,22 @@ typedef enum {
 typedef ap_uint<WORD_WIDTH> word_t;
 typedef ap_int<WORD_WIDTH> sword_t;
 typedef ap_uint<ADDR_WIDTH> addr_t;
+
+typedef ap_uint<TAG_WIDTH> tag_t;
+typedef enum {
+    CMDTAG_UART = 0x8,
+    CMDTAG_REG  = 0x0
+} command_tag_e;
+typedef struct {
+    tag_t   tag;
+    word_t  word;
+}  command_t;
+inline command_t make_command_word(tag_t t, word_t w) {
+    command_t cw;
+    cw.tag = t;
+    cw.word = w;
+    return cw;
+}
 
 // Conntrol command
 typedef enum {
@@ -140,13 +157,30 @@ typedef enum {
 #define PYNQ_BUTTON_CODE_NONE   ('K' | ('0' << 8) | ('0' << 16) | ('0' << 24))
 #endif
 
+inline char convert2hex(char c) {
+	char h = 0;
+	if ((c >= '0') && (c <= '9')) { h = (c-'0'); }
+	else if ((c >= 'a') && (c <= 'f')) { h = (c-'a'+10); }
+	else if ((c >= 'A') && (c <= 'F')) { h = (c-'A'+10); }
+	return h;
+}
+
+inline word_t make_hex_bin(uint32_t hex_chars4) {
+	word_t hex_data = 0;
+	for (int i = 0; i < 4; i++) {
+		char c = (hex_chars4 >> i*8) & 0xFF;
+		hex_data += convert2hex(c) << (3-i)*4;
+	}
+	return hex_data;
+}
+
 // declarations of top functions
 void cpu_wrapper(
     #ifdef USE_PYNQ_BUTTON
 	hls::stream< ap_uint<1> >& led_active,
     #endif
-    hls::stream<word_t>& command_packet_in,
-    hls::stream<word_t>& command_packet_out,
+    hls::stream<command_t>& command_packet_in,
+    hls::stream<command_t>& command_packet_out,
     hls::stream<word_t>& interrupt_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,

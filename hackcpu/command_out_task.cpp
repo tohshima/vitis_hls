@@ -1,6 +1,6 @@
-// UART input task module for hackcpu
+// AXIREG/UART command out task module for hackcpu
 #include "hackcpu.hpp"
-#include "uart_in_task.hpp"
+#include "command_out_task.hpp"
 
 static volatile char debug_phase_uot_ = 0;
 
@@ -97,18 +97,22 @@ static int make_disp_out(
 }
 
 // convert command result output and display out data to uart chars for the controller GUI.
-void uart_out_task(
-	hls::stream<word_t>& command_out,
+void command_out_task(
+	hls::stream<command_t>& command_out,
 	hls::stream<addr_t>& dispadr_out,
 	hls::stream<word_t>& dispdat_out,
+	hls::stream<axireg_data_t>& axireg_command_out,
 	hls::stream<char>& uart_out,
+    hls::stream<bool>& reg_uart_disp_enable_read,
     hls::stream<ap_uint<1> >& dispflush_req,
     hls::stream<ap_uint<1> >& dispflush_ack
 ) {
 	#pragma HLS INTERFACE axis port=command_out depth=32
 	#pragma HLS INTERFACE axis port=dispadr_out depth=1
 	#pragma HLS INTERFACE axis port=dispdat_out depth=1
+	#pragma HLS INTERFACE axis port=axireg_command_out depth=1
 	#pragma HLS INTERFACE axis port=uart_out depth=1
+	#pragma HLS INTERFACE axis port=reg_uart_disp_enable_read depth=1
 	#pragma HLS INTERFACE axis port=dispflush_req depth=1
 	#pragma HLS INTERFACE axis port=dispflush_ack depth=1
 
@@ -116,22 +120,40 @@ void uart_out_task(
 		debug_phase_uot_ = 0xDD;
 		word_t addrM = dispadr_out.read();
 		word_t dataM = dispdat_out.read();
-		make_disp_out(addrM, dataM, uart_out);
+        if (reg_uart_disp_enable_read.read()) {
+    		make_disp_out(addrM, dataM, uart_out);
+        }
 	} else if (!command_out.empty()) {
 		debug_phase_uot_ = 0xD0;
 
-		word_t num_ret = command_out.read();
-		make_hex_chars(num_ret, uart_out);
+        command_t cw0 = command_out.read();
+		word_t num_ret = cw0.word;
+        tag_t tag = cw0.tag;
+        if (tag & CMDTAG_UART) {
+    		make_hex_chars(num_ret, uart_out);
+        } else {
+            axireg_command_out.write(num_ret);
+        }
 
 		debug_phase_uot_ = 0xD2;
 		for (int i = 0; i < num_ret; i++) {
-			word_t data = command_out.read();
-			make_hex_chars(data, uart_out);
+            command_t cw1 = command_out.read();
+            word_t data = cw1.word;
+            if (tag & CMDTAG_UART) {
+			    make_hex_chars(data, uart_out);
+            } else {
+                axireg_command_out.write(data);
+            }
 		}
 
 		debug_phase_uot_ = 0xD3;
-		word_t ret_status = command_out.read();
-		make_hex_chars(ret_status, uart_out);
+        command_t cw2 = command_out.read();
+		word_t ret_status = cw2.word;
+        if (tag & CMDTAG_UART) {
+    		make_hex_chars(ret_status, uart_out);
+        } else {
+            axireg_command_out.write(ret_status);
+        }
 	} /*else if (!dispflush_req.empty()) {
         if (uart_out.size() == 0) { // all uart out completed.
             dispflush_req.read();

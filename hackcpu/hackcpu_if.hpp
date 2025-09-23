@@ -1,15 +1,14 @@
-// HACKCPU UART IF top module 
-#ifndef __HACKCPU_UART_HPP__
-#define __HACKCPU_UART_HPP__
+// HACKCPU IF top module 
+#ifndef __HACKCPU_IF_HPP__
+#define __HACKCPU_IF_HPP__
 
 #include <ap_int.h>
+#include "axireg_if.hpp"
 #include "hackcpu.hpp"
 
-int hackcpu_uart(
-    #ifdef USE_ZYNQ_PS_UART
-    ap_uint<1> start,
-    #endif
-    #ifdef USE_PYNQ_BUTTON
+int hackcpu_if(
+    hls::stream<axireg_ext_t>& reg_ext_in,
+    hls::stream<axireg_ext_t>& reg_ext_out,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,
@@ -18,7 +17,6 @@ int hackcpu_uart(
     volatile ap_uint<1>& led_btn_L_out,
     volatile ap_uint<1>& led_btn_R_out,
     volatile ap_uint<1>& led_active_out,
-    #endif
 	volatile unsigned int *uart_reg,
     volatile ap_uint<8>& debug_phase
 );

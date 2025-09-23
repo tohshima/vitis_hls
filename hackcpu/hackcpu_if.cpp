@@ -4,9 +4,9 @@
 #include "hackcpu.hpp"
 #include "start_tasks.hpp"
 #include "uart_if.hpp"
-#include "hackcpu_uart.hpp"
+#include "axireg_if.hpp"
+#include "hackcpu_if.hpp"
 
-#ifdef USE_PYNQ_BUTTON
 static void sync_led_active(
     volatile ap_uint<1> btn_smp_clk,
     volatile ap_uint<1>& led_active_out,
@@ -92,13 +92,10 @@ static void check_buttons(
     led_btn_L_out = curr_btn2;
     led_btn_R_out = curr_btn1;
 }
-#endif
 
-int hackcpu_uart(
-    #ifdef USE_ZYNQ_PS_UART
-    ap_uint<1> uart_start,
-    #endif
-    #ifdef USE_PYNQ_BUTTON
+int hackcpu_if(
+    hls::stream<axireg_ext_t>& reg_ext_in,
+    hls::stream<axireg_ext_t>& reg_ext_out,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,
@@ -107,14 +104,14 @@ int hackcpu_uart(
     volatile ap_uint<1>& led_btn_L_out,
     volatile ap_uint<1>& led_btn_R_out,
     volatile ap_uint<1>& led_active_out,
-    #endif
 	volatile unsigned int *uart_reg,
     volatile ap_uint<8>& debug_phase
 ) {
-    #ifdef USE_ZYNQ_PS_UART
-    #pragma HLS INTERFACE s_axilite register port=uart_start
-    #endif
-    #ifdef USE_PYNQ_BUTTON
+    #pragma HLS INTERFACE axis port=reg_ext_in depth=1   
+    #pragma HLS INTERFACE axis port=reg_ext_out depth=1
+
+    //#pragma HLS INTERFACE s_axilite register port=uart_start
+
     #pragma HLS INTERFACE ap_none port=button_in0    
     #pragma HLS INTERFACE ap_none port=button_in1    
     #pragma HLS INTERFACE ap_none port=button_in2    
@@ -123,57 +120,50 @@ int hackcpu_uart(
     #pragma HLS INTERFACE ap_none port=led_btn_L_out    
     #pragma HLS INTERFACE ap_none port=led_btn_R_out    
     #pragma HLS INTERFACE ap_none port=led_active_out    
-    #endif
+
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
-    //#ifdef USE_ZYNQ_PS_UART
+
     //#pragma HLS INTERFACE s_axilite port=return
-    //#else
     #pragma HLS INTERFACE ap_ctrl_none port=return
-    //#endif
 
     #pragma HLS DATAFLOW
-    #ifdef USE_PYNQ_BUTTON
+
 	hls_thread_local hls::stream< ap_uint<1> > led_active;
     #pragma HLS STREAM variable=led_active_out depth=1
-    #endif
+
 	hls_thread_local hls::stream<token_word_t> uart_in;
     #pragma HLS STREAM variable=uart_in depth=32
+
 	hls_thread_local hls::stream<char> uart_out;
     #pragma HLS STREAM variable=uart_out depth=128
 	
-    start_tasks(
-        #ifdef USE_PYNQ_BUTTON
-        led_active,
-        #endif
-        uart_in, uart_out);
+	hls_thread_local hls::stream<bool> reg_uart_enable_read;
+    #pragma HLS STREAM variable=reg_uart_enable_read depth=1
+	hls_thread_local hls::stream<axireg_data_t> reg_command_in_read;
+    #pragma HLS STREAM variable=reg_command_in_read depth=1	
+	hls_thread_local hls::stream<axireg_data_t> reg_command_out_write;
+    #pragma HLS STREAM variable=reg_command_out_write depth=1
+		
+    start_tasks(led_active, uart_in, uart_out,
+        reg_ext_in, reg_ext_out, reg_uart_enable_read, reg_command_in_read, reg_command_out_write);
 
 #ifndef SIM_TATSKS
     bool sim_exit = false;
-    #ifndef USE_ZYNQ_PS_UART
-	for(;;) 
-    #endif
     {
         #pragma HLS PIPELINE
         debug_phase = 0x10;
-        #ifdef USE_ZYNQ_PS_UART
-        if (uart_start) 
-        #endif
-        {
+        if (reg_uart_enable_read.read()) {
+            debug_phase = 0x11;
             uart_if(uart_reg, uart_in, uart_out, sim_exit, debug_phase);
         }
 
-        #ifdef USE_PYNQ_BUTTON
-        debug_phase = 0x11;
+        debug_phase = 0x13;
         sync_led_active(btn_smp_clk, led_active_out, led_active);
         
-        debug_phase = 0x13;
+        debug_phase = 0x14;
         check_buttons(button_in0, button_in1, button_in2, button_in3, 
             btn_smp_clk, led_btn_L_out, led_btn_R_out, uart_in, debug_phase);
-        #endif
-    #ifndef USE_ZYNQ_PS_UART
-        if (sim_exit) return 0;
-    #endif
-	}
-    return 0;
+    }
 #endif
+    return sim_exit;
 }

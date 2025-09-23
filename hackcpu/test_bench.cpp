@@ -12,18 +12,55 @@
 #include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
 #ifndef SIM_CPU_WRAPPER
 #ifdef USE_HACKCPU_UART
-#include "hackcpu_uart.hpp"
+#include "hackcpu_if.hpp"
+#include "axireg_if.hpp"
 #elif defined(SIM_TASKS)
 #include "start_tasks.hpp"
 #else
 #include "uart_if.hpp"
-#include "uart_in_task.hpp"
+#include "command_in_task.hpp"
 #include "comp_task.hpp"
 #include "peripheral_task.hpp"
-#include "uart_out_task.hpp"
+#include "command_out_task.hpp"
 #endif
 #endif
 
+void read_rom_file_to_command(
+    const std::string& filename,
+    hls::stream<word_t>& command_data
+) {
+    std::ifstream file(filename);
+    std::string line;
+
+    word_t tmp[IRAM_SIZE];
+    
+    int length = 0;
+    while (std::getline(file, line)) {
+        word_t instruction = 0;
+        for (char c : line) {
+            instruction = (instruction << 1) | (c - '0');
+        }
+        tmp[length++] = instruction;
+        printf("%s %08x\n", line.c_str(), instruction.to_ushort());
+    }
+    command_data.write(LOAD_TO_IRAM);
+    command_data.write(0);
+    command_data.write(length);
+    for (int i = 0; i < length; i++) {
+        command_data.write(tmp[i]);
+    }
+}
+
+void read_rom_file_to_axireg(
+    const std::string& filename,
+    hls::stream<axireg_ext_t>& command_in
+) {
+    hls::stream<word_t> command_data;
+    read_rom_file_to_command(filename,command_data);
+    while(!command_data.empty()) {
+        command_in.write(make_axireg_val(AXIREG_IF_COMMAND_IN_ADDR, command_data.read()));
+    }
+}
 
 #ifndef SIM_CPU_WRAPPER
 #ifndef SIM_TASKS
@@ -31,10 +68,9 @@
 int main() {
     #ifdef USE_HACKCPU_UART
 
-    #ifdef USE_ZYNQ_PS_UART
-    ap_uint<1> uart_start = 0;
-    #endif
-    #ifdef USE_PYNQ_BUTTON
+    hls::stream<axireg_ext_t> reg_ext_in;
+    hls::stream<axireg_ext_t> reg_ext_out;
+
     volatile ap_uint<1> button_in0 = 0;
     volatile ap_uint<1> button_in1 = 0;
     volatile ap_uint<1> button_in2 = 0;
@@ -43,20 +79,45 @@ int main() {
     volatile ap_uint<1> led_btn_L_out = 0;
     volatile ap_uint<1> led_btn_R_out = 0;
     volatile ap_uint<1> led_active_out = 0;
-    #endif
     volatile ap_uint<8> debug_phase = 0;
     unsigned int uart_reg[UART_REG_SIZE] = {0};
-    return hackcpu_uart(
-        #ifdef USE_ZYNQ_PS_UART
-        uart_start,
-        #endif
-        #ifdef USE_PYNQ_BUTTON
+
+    reg_ext_in.write(make_axireg_val(AXIREG_IF_UART_ENABLE_ADDR, 1));
+    axireg_ext_t reg_in;
+    reg_in.addr = 0x4;
+    // Reset
+    reg_in.data = SET_RESET_CONFIG;
+    reg_ext_in.write(reg_in);
+    reg_in.data = RESET_BIT_RESET | RESET_BIT_HALT;
+    reg_ext_in.write(reg_in);
+    reg_in.data = SET_RESET_CONFIG;
+    reg_ext_in.write(reg_in);
+    reg_in.data = RESET_BIT_HALT;
+    reg_ext_in.write(reg_in);
+
+    read_rom_file_to_axireg("rom_pong.bin", reg_ext_in);
+
+    reg_in.data = NORMAL_OPERATION;
+    reg_ext_in.write(reg_in);
+
+    int count= 0;
+    char buf[256];
+    while(hackcpu_if(
+        reg_ext_in, reg_ext_out,
         button_in0, button_in1, button_in2, button_in3,
         btn_smp_clk, led_btn_L_out, led_btn_R_out, led_active_out,
-        #endif
-        uart_reg, debug_phase);
-
+        uart_reg, debug_phase) == 0)
+    {
+        while(!reg_ext_out.empty()) {
+            axireg_ext_t reg_out;
+            reg_out = reg_ext_out.read();
+            sprintf(buf, "Out %6d: [0x%02d] = 0x%04x", count++, reg_out.addr.to_uint(), reg_out.data.to_uint());
+            std::cout << buf << std::endl;
+        }        
+    }
+    return 0;
     #else
+    // ToDo: Fix IF
     unsigned int uart_reg[UART_REG_SIZE] = {0};
 
 	static hls_thread_local hls::stream<token_word_t> uart_in;
@@ -201,41 +262,26 @@ int main() {
 // only debug cpu_wrapper
 void read_rom_file(
     const std::string& filename,
-    hls::stream<word_t>& command_in,
-    hls::stream<word_t>& command_out,
+    hls::stream<command_t>& command_in,
+    hls::stream<command_t>& command_out,
     hls::stream<word_t>& interrupt_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
     hls::stream<addr_t>& peripheral_waddr_out,
     hls::stream<word_t>& peripheral_wdata_out
 ) {
-    std::ifstream file(filename);
-    std::string line;
-
-    word_t tmp[IRAM_SIZE];
-    
-    int length = 0;
-    while (std::getline(file, line)) {
-        word_t instruction = 0;
-        for (char c : line) {
-            instruction = (instruction << 1) | (c - '0');
-        }
-        tmp[length++] = instruction;
-        printf("%s %08x\n", line.c_str(), instruction.to_ushort());
-    }
-    command_in.write(LOAD_TO_IRAM);
-    command_in.write(0);
-    command_in.write(length);
-    for (int i = 0; i < length; i++) {
-        command_in.write(tmp[i]);
+    hls::stream<word_t> command_data;
+    read_rom_file_to_command(filename,command_data);
+    while(!command_data.empty()) {
+        command_in.write(make_command_word(CMDTAG_REG, command_data.read()));
     }
     cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
 }
 
 void get_debug_info(
-    hls::stream<word_t>& command_in, 
-    hls::stream<word_t>& command_out, 
+    hls::stream<command_t>& command_in, 
+    hls::stream<command_t>& command_out, 
     hls::stream<word_t>& interrupt_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
@@ -244,30 +290,30 @@ void get_debug_info(
     word_t bitmap, 
     debug_s& dinfo
 ) {
-    command_in.write(SET_RESET_CONFIG);
-    command_in.write(RESET_BIT_HALT);
-    command_in.write(GET_DEBUG_INFO);
-    command_in.write(bitmap);
+    command_in.write(make_command_word(CMDTAG_REG, SET_RESET_CONFIG));
+    command_in.write(make_command_word(CMDTAG_REG, RESET_BIT_HALT));
+    command_in.write(make_command_word(CMDTAG_REG, GET_DEBUG_INFO));
+    command_in.write(make_command_word(CMDTAG_REG, bitmap));
     cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     
     if (bitmap & DINFO_BIT_CYCLE) {
         uint64_t cycle = 0;
         for (int i = 0; i < 4; i++) {
-            cycle |= (uint64_t)command_out.read().to_ushort() << 16*i;
+            cycle |= (uint64_t)command_out.read().word.to_ushort() << 16*i;
         }
         dinfo.cycle = cycle;
     }
-    if (bitmap & DINFO_BIT_WOUT) dinfo.write_out = command_out.read();
-    if (bitmap & DINFO_BIT_OUTM) dinfo.outM = command_out.read();
-    if (bitmap & DINFO_BIT_ADDRM) dinfo.addressM = command_out.read();
-    if (bitmap & DINFO_BIT_PC) dinfo.pc = command_out.read();
-    if (bitmap & DINFO_BIT_REGA) dinfo.regA = command_out.read();
-    if (bitmap & DINFO_BIT_REGD) dinfo.regD = command_out.read();
-    if (bitmap & DINFO_BIT_ALUO) dinfo.alu_out = command_out.read();
-    if (bitmap & DINFO_BIT_INST1) dinfo.instruction1 = command_out.read();
-    if (bitmap & DINFO_BIT_INST2) dinfo.instruction2 = command_out.read();
-    if (bitmap & DINFO_BIT_SP) dinfo.sp = command_out.read();
+    if (bitmap & DINFO_BIT_WOUT) dinfo.write_out = command_out.read().word;
+    if (bitmap & DINFO_BIT_OUTM) dinfo.outM = command_out.read().word;
+    if (bitmap & DINFO_BIT_ADDRM) dinfo.addressM = command_out.read().word;
+    if (bitmap & DINFO_BIT_PC) dinfo.pc = command_out.read().word;
+    if (bitmap & DINFO_BIT_REGA) dinfo.regA = command_out.read().word;
+    if (bitmap & DINFO_BIT_REGD) dinfo.regD = command_out.read().word;
+    if (bitmap & DINFO_BIT_ALUO) dinfo.alu_out = command_out.read().word;
+    if (bitmap & DINFO_BIT_INST1) dinfo.instruction1 = command_out.read().word;
+    if (bitmap & DINFO_BIT_INST2) dinfo.instruction2 = command_out.read().word;
+    if (bitmap & DINFO_BIT_SP) dinfo.sp = command_out.read().word;
 }
 
 void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
@@ -318,8 +364,8 @@ void show_debug_info(word_t bitmap, debug_s& dinfo, bool header) {
 }
 
 int compare(
-    hls::stream<word_t>& command_in, 
-    hls::stream<word_t>& command_out, 
+    hls::stream<command_t>& command_in, 
+    hls::stream<command_t>& command_out, 
     hls::stream<word_t>& interrupt_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
@@ -340,8 +386,8 @@ int compare(
 int main() {
 
     // CPU interface signals
-    hls::stream<word_t> command_in;
-    hls::stream<word_t> command_out;
+    hls::stream<command_t> command_in;
+    hls::stream<command_t> command_out;
     hls::stream<word_t> interrupt_in;
     hls::stream<addr_t> peripheral_raddr_out;
     hls::stream<word_t> peripheral_rdata_in;
@@ -349,12 +395,12 @@ int main() {
     hls::stream<word_t> peripheral_wdata_out;
 
     // Reset CPU
-    command_in.write(SET_RESET_CONFIG);
-    command_in.write(RESET_BIT_RESET | RESET_BIT_HALT);
+    command_in.write(make_command_word(CMDTAG_REG,SET_RESET_CONFIG));
+    command_in.write(make_command_word(CMDTAG_REG,RESET_BIT_RESET | RESET_BIT_HALT));
     cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
-    command_in.write(SET_RESET_CONFIG);
-    command_in.write(RESET_BIT_HALT);
+    command_in.write(make_command_word(CMDTAG_REG,SET_RESET_CONFIG));
+    command_in.write(make_command_word(CMDTAG_REG,RESET_BIT_HALT));
     cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
 
@@ -364,9 +410,9 @@ int main() {
     read_rom_file("rom_pong.bin", command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
 
     // For rect example
-    command_in.write(WRITE_TO_DRAM);
-    command_in.write(0x0000);
-    command_in.write(0x0014);
+    command_in.write(make_command_word(CMDTAG_REG, WRITE_TO_DRAM));
+    command_in.write(make_command_word(CMDTAG_REG, 0x0000));
+    command_in.write(make_command_word(CMDTAG_REG, 0x0014));
 
     //command_in.write(SET_BREAK_CONDITION); // obsolete
     //command_in.write(BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN);
@@ -379,36 +425,36 @@ int main() {
     // Run CPU cycle
     #if 1
     // Run through
-    command_in.write(SET_RESET_CONFIG);
-    command_in.write(0);
+    command_in.write(make_command_word(CMDTAG_REG, SET_RESET_CONFIG));
+    command_in.write(make_command_word(CMDTAG_REG, 0));
     cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     #elif 0
     // Step debugging
     for (int i = 0; i < 5000000; i++) {
-        command_in.write(STEP_EXECUTION);
+        command_in.write(make_command_word(CMDTAG_REG, STEP_EXECUTION));
         cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
         DUMMY_READ();
         compare(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, (i == 0));
     }
     #else
     // Run until mem out
-    command_in.write(SET_BREAK_CONDITION);
-    command_in.write(BREAK_CONDITION_BIT_DISPOUT);
-    command_in.write(SET_RESET_CONFIG);
-    command_in.write(0);
+    command_in.write(make_command_word(CMDTAG_REG, SET_BREAK_CONDITION));
+    command_in.write(make_command_word(CMDTAG_REG, BREAK_CONDITION_BIT_DISPOUT));
+    command_in.write(make_command_word(CMDTAG_REG, SET_RESET_CONFIG));
+    command_in.write(make_command_word(CMDTAG_REG, 0));
     for (int i = 0; i < 2000; i++) {
-        command_in.write(NORMAL_OPERATION);
+        command_in.write(make_command_word(CMDTAG_REG,NORMAL_OPERATION));
         cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
         DUMMY_READ();
         compare(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out, (i == 0));
     }
     #endif
 
-    command_in.write(SET_RESET_CONFIG);
-    command_in.write(RESET_BIT_HALT);
-    command_in.write(READ_FROM_DRAM);
-    command_in.write(0x0007);
+    command_in.write(make_command_word(CMDTAG_REG, SET_RESET_CONFIG));
+    command_in.write(make_command_word(CMDTAG_REG, RESET_BIT_HALT));
+    command_in.write(make_command_word(CMDTAG_REG, READ_FROM_DRAM));
+    command_in.write(make_command_word(CMDTAG_REG, 0x0007));
     cpu_wrapper(command_in, command_out, interrupt_in, peripheral_raddr_out, peripheral_rdata_in, peripheral_waddr_out, peripheral_wdata_out);
     DUMMY_READ();
     return 0;

@@ -281,8 +281,8 @@ void cpu_wrapper(
     #ifdef USE_PYNQ_BUTTON
 	hls::stream< ap_uint<1> >& led_active,
     #endif
-	hls::stream<word_t>& command_packet_in,
-    hls::stream<word_t>& command_packet_out,
+	hls::stream<command_t>& command_packet_in,
+    hls::stream<command_t>& command_packet_out,
     hls::stream<word_t>& interrupt_in,
     hls::stream<addr_t>& peripheral_raddr_out,
     hls::stream<word_t>& peripheral_rdata_in,
@@ -314,7 +314,9 @@ void cpu_wrapper(
 
 	//while (!command_packet_in.empty()) {
 		// feed a new command
-		control_command_e command = (control_command_e)command_packet_in.read().to_int();
+        command_t cw = command_packet_in.read();
+		control_command_e command = (control_command_e)cw.word.to_int();
+        tag_t tag = cw.tag;
         #ifdef USE_PYNQ_BUTTON
         led_active.write(1);
         #endif
@@ -326,10 +328,10 @@ void cpu_wrapper(
 			case SET_RESET_CONFIG:
 			{
 				while(command_packet_in.empty()) {}
-				word_t bitmap = command_packet_in.read();
+				word_t bitmap = command_packet_in.read().word;
 				reset = (bitmap & RESET_BIT_RESET)? 1: 0;
 				halt = (bitmap & RESET_BIT_HALT)? 1: 0;
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 			}
 			case GET_RESET_CONFIG:
@@ -337,58 +339,58 @@ void cpu_wrapper(
 				word_t bitmap = 0;
 				if (reset) bitmap |= RESET_BIT_RESET;
 				if (halt) bitmap |= RESET_BIT_HALT;
-				SEND_NUM_RETVALS(1);
-				command_packet_out.write(bitmap);
+				SEND_NUM_RETVALS(make_command_word(tag, 1));
+				command_packet_out.write(make_command_word(tag, bitmap));
 				break;
 			}
 			case WRITE_TO_IRAM:
 			{
 				while(command_packet_in.empty()) {}
-				addr_t address = (addr_t)command_packet_in.read();
+				addr_t address = (addr_t)command_packet_in.read().word;
 				while(command_packet_in.empty()) {}
-				word_t data = command_packet_in.read();
+				word_t data = command_packet_in.read().word;
 				i_ram[address] = data;
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 			}
 			case LOAD_TO_IRAM:
 			{
 				while(command_packet_in.empty()) {}
-				addr_t address = (addr_t)command_packet_in.read();
+				addr_t address = (addr_t)command_packet_in.read().word;
 				while(command_packet_in.empty()) {}
-				word_t length = command_packet_in.read();
+				word_t length = command_packet_in.read().word;
 				for (word_t i = 0; i < length; i++) {
 					while(command_packet_in.empty()) {}
-					word_t data = command_packet_in.read();
+					word_t data = command_packet_in.read().word;
 					i_ram[address+i] = data;
 				}
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 			}
 			case READ_FROM_IRAM:
 			{
 				while(command_packet_in.empty()) {}
-				addr_t address = (addr_t)command_packet_in.read();
-				SEND_NUM_RETVALS(1);
-				command_packet_out.write(i_ram[address]);
+				addr_t address = (addr_t)command_packet_in.read().word;
+				SEND_NUM_RETVALS(make_command_word(tag, 1));
+				command_packet_out.write(make_command_word(tag, i_ram[address]));
 				break;
 			}
 			case WRITE_TO_DRAM:
 			{
 				while(command_packet_in.empty()) {}
-				addr_t address = (addr_t)command_packet_in.read();
+				addr_t address = (addr_t)command_packet_in.read().word;
 				while(command_packet_in.empty()) {}
-				word_t data = command_packet_in.read();
+				word_t data = command_packet_in.read().word;
 				d_ram[address] = data;
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 			}
 			case READ_FROM_DRAM:
 			{
 				while(command_packet_in.empty()) {}
-				addr_t address = (addr_t)command_packet_in.read();
-				SEND_NUM_RETVALS(1);
-				command_packet_out.write(d_ram[address]);
+				addr_t address = (addr_t)command_packet_in.read().word;
+				SEND_NUM_RETVALS(make_command_word(tag, 1));
+				command_packet_out.write(make_command_word(tag, d_ram[address]));
 				break;
 			}
 			case STEP_EXECUTION:
@@ -399,50 +401,50 @@ void cpu_wrapper(
 				break;
 			case SET_BREAK_CONDITION:
 				while(command_packet_in.empty()) {}
-				break_condition_bitmap = command_packet_in.read();
+				break_condition_bitmap = command_packet_in.read().word;
 				if (break_condition_bitmap & BREAK_CONDITION_BIT_INTERVAL) {
-					break_cycle_interval = command_packet_in.read().to_uint64();
+					break_cycle_interval = command_packet_in.read().word.to_uint64();
 				}
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 			case MULTI_STEP_EXECUTION:
 			{
 				while(command_packet_in.empty()) {}
-				word_t steps = command_packet_in.read();
+				word_t steps = command_packet_in.read().word;
 				cycle_to_stop = cycle+steps;
 				halt = 0;
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 			}
 			case GET_DEBUG_INFO:
 			{
 				while(command_packet_in.empty()) {}
-				word_t bitmap = command_packet_in.read();
+				word_t bitmap = command_packet_in.read().word;
 				word_t bitcnt = ((bitmap & DINFO_BIT_CYCLE) ? 3:0) + bit_count(bitmap);
-				SEND_NUM_RETVALS(bitcnt);
+				SEND_NUM_RETVALS(make_command_word(tag, bitcnt));
 
 				if (bitmap & DINFO_BIT_CYCLE) {
-					command_packet_out.write(cycle & 0xFFFF);
-					command_packet_out.write((cycle >> 16) & 0xFFFF);
-					command_packet_out.write((cycle >> 32) & 0xFFFF);
-					command_packet_out.write((cycle >> 48) & 0xFFFF);
+					command_packet_out.write(make_command_word(tag, cycle & 0xFFFF));
+					command_packet_out.write(make_command_word(tag, (cycle >> 16) & 0xFFFF));
+					command_packet_out.write(make_command_word(tag,(cycle >> 32) & 0xFFFF));
+					command_packet_out.write(make_command_word(tag, (cycle >> 48) & 0xFFFF));
 				}
-				if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(write_out);
-				if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(outM);
-				if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(addressM);
-				if (bitmap & DINFO_BIT_PC) command_packet_out.write(pc_of_cycle_start);
-				if (bitmap & DINFO_BIT_REGA) command_packet_out.write(Regs.A);
-				if (bitmap & DINFO_BIT_REGD) command_packet_out.write(Regs.D);
-				if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(alu_out);
-				if (bitmap & DINFO_BIT_INST1) command_packet_out.write(first_inst);
-				if (bitmap & DINFO_BIT_INST2) command_packet_out.write(next_inst);
-				if (bitmap & DINFO_BIT_SP) command_packet_out.write(d_ram[0]);
+				if (bitmap & DINFO_BIT_WOUT) command_packet_out.write(make_command_word(tag, write_out));
+				if (bitmap & DINFO_BIT_OUTM) command_packet_out.write(make_command_word(tag, outM));
+				if (bitmap & DINFO_BIT_ADDRM) command_packet_out.write(make_command_word(tag, addressM));
+				if (bitmap & DINFO_BIT_PC) command_packet_out.write(make_command_word(tag, pc_of_cycle_start));
+				if (bitmap & DINFO_BIT_REGA) command_packet_out.write(make_command_word(tag, Regs.A));
+				if (bitmap & DINFO_BIT_REGD) command_packet_out.write(make_command_word(tag, Regs.D));
+				if (bitmap & DINFO_BIT_ALUO) command_packet_out.write(make_command_word(tag, alu_out));
+				if (bitmap & DINFO_BIT_INST1) command_packet_out.write(make_command_word(tag, first_inst));
+				if (bitmap & DINFO_BIT_INST2) command_packet_out.write(make_command_word(tag, next_inst));
+				if (bitmap & DINFO_BIT_SP) command_packet_out.write(make_command_word(tag, d_ram[0]));
 				break;
 			}
 
 			default:
 				halt = 1;
-				SEND_NUM_RETVALS(0);
+				SEND_NUM_RETVALS(make_command_word(tag, 0));
 				break;
 		}
 		word_t break_reason = BREAK_REASON_NOP;
@@ -455,11 +457,11 @@ void cpu_wrapper(
             if (reset) {
                 for (int i = 0; i < sizeof(d_ram)/sizeof(word_t); i++) d_ram[i] = 0;
             } else {
-                SEND_NUM_RETVALS(0);
+                SEND_NUM_RETVALS(make_command_word(tag, 0));
             }
 			halt = 1;
 		}
-		SEND_STATUS(break_reason);
+		SEND_STATUS(make_command_word(tag, break_reason));
         #ifdef USE_PYNQ_BUTTON
         led_active.write(0);
         #endif

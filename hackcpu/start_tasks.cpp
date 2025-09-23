@@ -3,29 +3,34 @@
 
 #include "hackcpu.hpp"
 #include "uart_if.hpp"
-#include "uart_in_task.hpp"
+#include "command_in_task.hpp"
 #include "comp_task.hpp"
 #include "peripheral_task.hpp"
-#include "uart_out_task.hpp"
+#include "command_out_task.hpp"
+#include "axireg_if.hpp"
 #include "start_tasks.hpp"
 
 void start_tasks(
-    #ifdef USE_PYNQ_BUTTON
 	hls::stream< ap_uint<1> >& led_active,
-    #endif
 	hls::stream<token_word_t>& uart_in,
-	hls::stream<char>& uart_out
+	hls::stream<char>& uart_out,
+    hls::stream<axireg_ext_t>& reg_ext_in,
+    hls::stream<axireg_ext_t>& reg_ext_out,
+    hls::stream<bool>& reg_uart_enable_read,
+    hls::stream<axireg_data_t>& reg_command_in_read,
+    hls::stream<axireg_data_t>& reg_command_out_write
 ) {
     #pragma HLS INLINE
 
-    #ifdef USE_PYNQ_BUTTON
     #pragma HLS INTERFACE axis port=led_active depth=1
-    #endif
+    #pragma HLS INTERFACE ap_fifo port=reg_uart_enable_read depth=1
+    #pragma HLS INTERFACE ap_fifo port=reg_command_in_read depth=1
+    #pragma HLS INTERFACE ap_fifo port=reg_command_out_write depth=1
 
 	// CPU interface signals
-    hls_thread_local hls::stream<word_t> command_in;
+    hls_thread_local hls::stream<command_t> command_in;
     #pragma HLS STREAM variable=command_in depth=32
-    hls_thread_local hls::stream<word_t> command_out;
+    hls_thread_local hls::stream<command_t> command_out;
     #pragma HLS STREAM variable=command_out depth=32
     hls_thread_local hls::stream<word_t> ext_key_in;
     #pragma HLS STREAM variable=ext_key_in depth=2
@@ -47,12 +52,14 @@ void start_tasks(
     #pragma HLS STREAM variable=dispadr_out depth=1
     hls_thread_local hls::stream<word_t> dispdat_out;
     #pragma HLS STREAM variable=dispdat_out depth=1
+    hls_thread_local  hls::stream<bool> reg_uart_disp_enable_read;
+    #pragma HLS STREAM variable=reg_uart_disp_enable_read depth=1
     hls_thread_local hls::stream<ap_uint<1> > dispflush_req;
     #pragma HLS STREAM variable=dispflush_req depth=1
     hls_thread_local hls::stream<ap_uint<1> > dispflush_ack;
     #pragma HLS STREAM variable=dispflush_ack depth=1
 
-	hls_thread_local hls::task uit(uart_in_task, uart_in, command_in, ext_key_in, ext_interrupt_in);
+	hls_thread_local hls::task cit(command_in_task, reg_command_in_read, uart_in, command_in, ext_key_in, ext_interrupt_in);
 	hls_thread_local hls::task ct(comp_task, 
         #ifdef USE_PYNQ_BUTTON
         led_active,
@@ -62,5 +69,6 @@ void start_tasks(
     //hls_thread_local hls::task itt(interrupt_in_task, ext_interrupt_in, interrupt_in);
     //hls_thread_local hls::task pwt(peripheral_write_task, peripheral_waddr_out, peripheral_wdata_out, dispadr_out, dispdat_out);
     //hls_thread_local hls::task prt(peripheral_read_task, ext_key_in, peripheral_raddr_out, peripheral_rdata_in);
-	hls_thread_local hls::task uot(uart_out_task, command_out, dispadr_out, dispdat_out, uart_out, dispflush_req, dispflush_ack);
+	hls_thread_local hls::task cot(command_out_task, command_out, dispadr_out, dispdat_out, reg_command_out_write, uart_out, reg_uart_disp_enable_read, dispflush_req, dispflush_ack);
+	hls_thread_local hls::task reg(axireg_task, reg_ext_in, reg_ext_out, reg_uart_enable_read, reg_uart_disp_enable_read, reg_command_in_read, reg_command_out_write);
 }
