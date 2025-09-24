@@ -14,6 +14,7 @@ uart_comm uart_comm(USE_COM);  // ポートを開く
 
 #if defined(__SYNTHESIS__)
 static bool is_not_tx_fifo_full(volatile unsigned int *uart_reg) {
+    #pragma HLS INLINE
 #ifdef USE_ZYNQ_PS_UART
     return (uart_reg[XUARTPS_SR_OFFSET] & 0x00000010) == 0;
 #else
@@ -22,6 +23,7 @@ static bool is_not_tx_fifo_full(volatile unsigned int *uart_reg) {
 #endif
 }
 static void write_to_tx_fifo(volatile unsigned int *uart_reg, char c) {
+    #pragma HLS INLINE
 #ifdef USE_ZYNQ_PS_UART
     uart_reg[XUARTPS_FIFO_OFFSET] = c;
 #else
@@ -32,10 +34,11 @@ static void write_to_tx_fifo(volatile unsigned int *uart_reg, char c) {
 #endif
 
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
+    #pragma HLS INLINE
      // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16
 	#pragma HLS INTERFACE axis port=uart_out depth=1
-    #pragma HLS DATAFLOW
+
 #if !defined(__SYNTHESIS__)
 	char uo[2048];
 	size_t length = 0;
@@ -65,6 +68,7 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 
 #if defined(__SYNTHESIS__)
 static bool is_not_rx_fifo_empty(volatile unsigned int *uart_reg) {
+    #pragma HLS INLINE
 #ifdef USE_ZYNQ_PS_UART
     return (uart_reg[XUARTPS_SR_OFFSET] & 0x00000002) == 0;
 #else
@@ -73,6 +77,7 @@ static bool is_not_rx_fifo_empty(volatile unsigned int *uart_reg) {
 #endif
 }
 static char read_from_rx_fifo(volatile unsigned int *uart_reg) {
+    #pragma HLS INLINE
 #ifdef USE_ZYNQ_PS_UART
     return uart_reg[XUARTPS_FIFO_OFFSET];
 #else
@@ -87,11 +92,11 @@ static bool get_token(
     hls::stream<ap_uint<8*TOKEN_SIZE>>& uart_in,
     volatile bool& sim_exit
 ) {
+    #pragma HLS INLINE
     // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16 
 	#pragma HLS INTERFACE axis port=uart_in depth=4
-    #pragma HLS DATAFLOW
-    
+
     static char debug_rx_data_ = 0;
 	static int char_index = 0;
 	static ap_uint<8*TOKEN_SIZE> token = 0;
@@ -139,6 +144,8 @@ void uart_if(
     #pragma HLS INTERFACE ap_ctrl_none port=return
     #endif
     static bool initialized = false;
+
+    //#pragma HLS DATAFLOW
 
 	// ボーレート設定（例：115200 bps）
 	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します
