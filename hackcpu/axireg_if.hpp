@@ -9,9 +9,9 @@
 typedef ap_uint<AXIREG_DATA_WIDTH> axireg_data_t;
 typedef ap_uint<AXIREG_ADDR_WIDTH>  axireg_addr_t;
 typedef struct {
-    axireg_addr_t addr;
     axireg_data_t data;
-} axireg_ext_t;
+    axireg_addr_t addr;
+} __attribute__((packed)) axireg_ext_t;
 
 typedef struct {
     bool uart_enable;
