@@ -34,16 +34,16 @@ static void write_to_tx_fifo(volatile unsigned int *uart_reg, char c) {
 #endif
 
 static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_out) {
-    #pragma HLS INLINE
+    //#pragma HLS INLINE
      // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16
 	#pragma HLS INTERFACE axis port=uart_out depth=1
-
+    #pragma HLS latency max=100
 #if !defined(__SYNTHESIS__)
 	char uo[2048];
 	size_t length = 0;
 	for (int i = 0; i < sizeof(uo); i++) {
-        #pragma HLS PIPELINE
+        #pragma HLS PIPELINE II=4
 		if (uart_out.empty()) break;
 		uo[i] = uart_out.read();
 		length++;
@@ -52,11 +52,13 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 		uart_comm.write_data(uo, length);
 	}
 #else
-	while (!uart_out.empty()) {
+	for (int i = 0; i < 16; i++) {
+        #pragma HLS UNROLL
     	// TXFIFOが満杯でないか確認
-        if (is_not_tx_fifo_full(uart_reg)) {
+        if (!uart_out.empty() && is_not_tx_fifo_full(uart_reg)) {
             // データをTXFIFOに書き込む
-            write_to_tx_fifo(uart_reg, uart_out.read());
+            char c = uart_out.read();
+            write_to_tx_fifo(uart_reg, c);
         } else {
             // 満杯だったらいったん中断して次の回に
             break;
