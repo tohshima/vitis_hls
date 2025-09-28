@@ -107,8 +107,8 @@ int hackcpu_if(
 	volatile unsigned int *uart_reg,
     volatile ap_uint<8>& debug_phase
 ) {
-    #pragma HLS INTERFACE axis port=reg_ext_in depth=1   
-    #pragma HLS INTERFACE axis port=reg_ext_out depth=1
+    #pragma HLS INTERFACE axis port=reg_ext_in depth=16   
+    #pragma HLS INTERFACE axis port=reg_ext_out depth=16
 
     //#pragma HLS INTERFACE s_axilite register port=uart_start
 
@@ -123,6 +123,7 @@ int hackcpu_if(
 
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=20 // depthを正しく設定しないとCo-simがうまくいかない
 
+    #pragma HLS INTERFACE ap_none port=debug_phase
     //#pragma HLS INTERFACE s_axilite port=return
     #pragma HLS INTERFACE ap_ctrl_none port=return
 
