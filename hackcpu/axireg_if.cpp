@@ -17,8 +17,8 @@ void axireg_task(
     hls::stream<axireg_data_t>& reg_command_in_read,
     hls::stream<axireg_data_t>& reg_command_out_write
 ) {
-    #pragma HLS INTERFACE axis port=reg_ext_in depth=1   
-    #pragma HLS INTERFACE axis port=reg_ext_out depth=1
+    #pragma HLS INTERFACE axis port=reg_ext_in depth=16   
+    #pragma HLS INTERFACE axis port=reg_ext_out depth=16
     #pragma HLS INTERFACE ap_fifo port=reg_uart_enable_read depth=1
     #pragma HLS INTERFACE ap_fifo port=reg_uart_disp_enable_read depth=1
     #pragma HLS INTERFACE ap_fifo port=reg_command_in_read depth=1
@@ -48,7 +48,7 @@ void axireg_task(
     if (!reg_uart_disp_enable_read.full()) {
         reg_uart_disp_enable_read.write(s_regs.uard_disp_enable);
     }
-    if (!reg_command_out_write.empty()) {
+    if (!reg_command_out_write.empty() && !reg_ext_out.full()) {
         axireg_data_t d = reg_command_out_write.read();
         reg_ext_out.write(make_axireg_val(AXIREG_IF_COMMAND_OUT_ADDR, d));
     }
