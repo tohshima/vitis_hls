@@ -134,6 +134,7 @@ void uart_if(
 	volatile unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
+    bool uart_if_enable,
     bool& sim_exit,
     volatile ap_uint<8>& debug_phase
 ) {
@@ -147,7 +148,8 @@ void uart_if(
     #endif
     static bool initialized = false;
 
-    //#pragma HLS DATAFLOW
+    #pragma HLS INLINE
+    //#pragma HLS PIPLEINE II=1
 
 	// ボーレート設定（例：115200 bps）
 	// 注: 実際のボーレート設定はUART Lite IPの設定に依存します
@@ -164,8 +166,10 @@ void uart_if(
 	} else {
 		//#pragma HLS DATAFLOW
 		//while (1) {
-            debug_phase = 0x20;
-			get_token(uart_reg, uart_in, sim_exit);
+            if (uart_if_enable) {
+                debug_phase = 0x20;
+                get_token(uart_reg, uart_in, sim_exit);
+            }
             debug_phase = 0x22;
 			send_chars(uart_reg, uart_out);
 		//}

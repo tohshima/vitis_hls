@@ -5,51 +5,58 @@
 //#define GET_ADDR(v) (((axireg_ext_t)v >> AXIREG_DATA_WIDTH) & ((1 << AXIREG_ADDR_WIDTH)-1))
 //#define GET_DATA(v) ((axireg_ext_t)v & (((axireg_ext_t)1 << AXIREG_DATA_WIDTH)-1))
 
-static regs_t s_regs = {
-    .uart_enable = false,
-};
 
-void axireg_task(
-    hls::stream<axireg_ext_t>& reg_ext_in,
-    hls::stream<axireg_ext_t>& reg_ext_out,
+void axireg_if(
+    axi_regs_t& axi_regs,
     hls::stream<bool>& reg_uart_enable_read,
     hls::stream<bool>& reg_uart_disp_enable_read,
-    hls::stream<axireg_data_t>& reg_command_in_read,
-    hls::stream<axireg_data_t>& reg_command_out_write
+    hls::stream<axi_reg_t>& reg_command_in_read,
+    hls::stream<axi_reg_t>& reg_command_out_write
 ) {
-    #pragma HLS INTERFACE axis port=reg_ext_in depth=16   
-    #pragma HLS INTERFACE axis port=reg_ext_out depth=16
+    #pragma HLS INLINE
+    //#pragma HLS PIPELINE II=1
+    #pragma HLS INTERFACE s_axilite register port=axi_regs   
     #pragma HLS INTERFACE ap_fifo port=reg_uart_enable_read depth=1
     #pragma HLS INTERFACE ap_fifo port=reg_uart_disp_enable_read depth=1
-    #pragma HLS INTERFACE ap_fifo port=reg_command_in_read depth=1
-    #pragma HLS INTERFACE ap_fifo port=reg_command_out_write depth=1
+    #pragma HLS INTERFACE ap_fifo port=reg_command_in_read depth=20
+    #pragma HLS INTERFACE ap_fifo port=reg_command_out_write depth=18
 
-    if (!reg_ext_in.empty()) {
-        axireg_ext_t v = reg_ext_in.read();
-        reg_ext_out.write(v);
-        axireg_addr_t addr = v.addr;
-        axireg_data_t data = v.data;
-        
-        switch(addr) {
-        case AXIREG_IF_UART_ENABLE_ADDR:
-            s_regs.uart_enable = data[0];
-            s_regs.uard_disp_enable = data[1];
-            break;
-        case AXIREG_IF_COMMAND_IN_ADDR:
-            reg_command_in_read.write(data);
-            break;
-        default:
-            break;
+    if (!axireg_is_command_busy(&axi_regs)) {
+        if (axireg_is_command_start(&axi_regs)) {
+            axireg_clear_command_start(&axi_regs);
+            axireg_set_command_busy(&axi_regs);
+            axireg_clear_command_done(&axi_regs);
+            axi_reg_t w = axi_regs.command_in_word;
+            axi_reg_t n = axi_regs.command_in_num_params;
+            reg_command_in_read.write(w);
+            for (axi_reg_t i = 0; i < n; i++) {
+                #pragma HLS UNNROLL
+                reg_command_in_read.write(axi_regs.command_in_params[i]);
+            }            
+        }
+    } else {
+        // WIP
+        if (!reg_command_out_write.empty()) {
+            axi_reg_t n = reg_command_out_write.read();
+            axi_regs.command_out_num_params = n;
+            for (axi_reg_t i = 0; i < sizeof(axi_regs.command_out_params)/sizeof(axi_regs.command_out_params[0]); i++) {
+                #pragma HLS UNROLL
+                if (i < n) {
+                    axi_regs.command_out_params[i] = reg_command_out_write.read();
+                } else {
+                    axi_regs.command_out_params[i] = 0;
+                }
+            }
+            axi_reg_t s = reg_command_out_write.read();
+            axi_regs.command_out_status = s;
+            axireg_clear_command_busy(&axi_regs);
+            axireg_set_command_done(&axi_regs);
         }
     }
     if (!reg_uart_enable_read.full()) {
-        reg_uart_enable_read.write(s_regs.uart_enable);
+        reg_uart_enable_read.write(axireg_is_uart_enable(&axi_regs));
     }
     if (!reg_uart_disp_enable_read.full()) {
-        reg_uart_disp_enable_read.write(s_regs.uard_disp_enable);
-    }
-    if (!reg_command_out_write.empty() && !reg_ext_out.full()) {
-        axireg_data_t d = reg_command_out_write.read();
-        reg_ext_out.write(make_axireg_val(AXIREG_IF_COMMAND_OUT_ADDR, d));
+        reg_uart_disp_enable_read.write(axireg_is_uart_disp_enable(&axi_regs));
     }
 }

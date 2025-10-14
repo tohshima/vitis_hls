@@ -10,6 +10,7 @@ void uart_if(
 	volatile unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
+    bool uart_if_enable,
     bool& sim_exit,
     volatile ap_uint<8>& debug_phase
 );

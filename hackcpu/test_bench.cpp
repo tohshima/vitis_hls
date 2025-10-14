@@ -13,7 +13,8 @@
 #ifndef SIM_CPU_WRAPPER
 #ifdef USE_HACKCPU_UART
 #include "hackcpu_if.hpp"
-#include "axireg_if.hpp"
+#include "axireg_if_def.hpp"
+#include "test_bench_axireg.hpp"
 #elif defined(SIM_TASKS)
 #include "start_tasks.hpp"
 #else
@@ -27,7 +28,8 @@
 
 void read_rom_file_to_command(
     const std::string& filename,
-    hls::stream<word_t>& command_data
+    hls::stream<word_t>& command_data,
+    int one_length=0
 ) {
     std::ifstream file(filename);
     std::string line;
@@ -43,24 +45,38 @@ void read_rom_file_to_command(
         tmp[length++] = instruction;
         printf("%s %08x\n", line.c_str(), instruction.to_ushort());
     }
-    command_data.write(LOAD_TO_IRAM);
-    command_data.write(0);
-    command_data.write(length);
-    for (int i = 0; i < length; i++) {
-        command_data.write(tmp[i]);
+    if (one_length == 0) {
+        command_data.write(LOAD_TO_IRAM);
+        command_data.write(0);
+        command_data.write(length);
+        for (int i = 0; i < length; i++) {
+            command_data.write(tmp[i]);
+        }
+    } else {
+        int times = length / one_length;
+        int rem   = length % one_length;
+        word_t curr_addr = 0;
+        for (int i = 0; i < times; i++) {
+            command_data.write(LOAD_TO_IRAM);
+            command_data.write(curr_addr);
+            command_data.write(one_length);
+            for (int i = 0; i < one_length; i++) {
+                command_data.write(tmp[curr_addr+i]);
+            }
+            curr_addr += one_length;
+        }
+        if (rem) {
+            command_data.write(LOAD_TO_IRAM);
+            command_data.write(curr_addr);
+            command_data.write(rem);
+            for (int i = 0; i < rem; i++) {
+                command_data.write(tmp[curr_addr+i]);
+            }
+        }
     }
 }
 
-void read_rom_file_to_axireg(
-    const std::string& filename,
-    hls::stream<axireg_ext_t>& command_in
-) {
-    hls::stream<word_t> command_data;
-    read_rom_file_to_command(filename,command_data);
-    while(!command_data.empty()) {
-        command_in.write(make_axireg_val(AXIREG_IF_COMMAND_IN_ADDR, command_data.read()));
-    }
-}
+
 
 #ifndef SIM_CPU_WRAPPER
 #ifndef SIM_TASKS
@@ -68,53 +84,10 @@ void read_rom_file_to_axireg(
 int main() {
     #ifdef USE_HACKCPU_UART
 
-    hls::stream<axireg_ext_t> reg_ext_in;
-    hls::stream<axireg_ext_t> reg_ext_out;
+    axi_regs_t axi_regs;
 
-    volatile ap_uint<1> button_in0 = 0;
-    volatile ap_uint<1> button_in1 = 0;
-    volatile ap_uint<1> button_in2 = 0;
-    volatile ap_uint<1> button_in3 = 0;
-    volatile ap_uint<1> btn_smp_clk = 0;
-    volatile ap_uint<1> led_btn_L_out = 0;
-    volatile ap_uint<1> led_btn_R_out = 0;
-    volatile ap_uint<1> led_active_out = 0;
-    volatile ap_uint<8> debug_phase = 0;
-    unsigned int uart_reg[UART_REG_SIZE] = {0};
+    test_bench_axireg(&axi_regs);
 
-    reg_ext_in.write(make_axireg_val(AXIREG_IF_UART_ENABLE_ADDR, 1));
-    axireg_ext_t reg_in;
-    reg_in.addr = 0x4;
-    // Reset
-    reg_in.data = SET_RESET_CONFIG;
-    reg_ext_in.write(reg_in);
-    reg_in.data = RESET_BIT_RESET | RESET_BIT_HALT;
-    reg_ext_in.write(reg_in);
-    reg_in.data = SET_RESET_CONFIG;
-    reg_ext_in.write(reg_in);
-    reg_in.data = RESET_BIT_HALT;
-    reg_ext_in.write(reg_in);
-
-    read_rom_file_to_axireg("rom_pong.bin", reg_ext_in);
-
-    reg_in.data = NORMAL_OPERATION;
-    reg_ext_in.write(reg_in);
-
-    int count= 0;
-    char buf[256];
-    while(hackcpu_if(
-        reg_ext_in, reg_ext_out,
-        button_in0, button_in1, button_in2, button_in3,
-        btn_smp_clk, led_btn_L_out, led_btn_R_out, led_active_out,
-        uart_reg, debug_phase) == 0)
-    {
-        while(!reg_ext_out.empty()) {
-            axireg_ext_t reg_out;
-            reg_out = reg_ext_out.read();
-            sprintf(buf, "Out %6d: [0x%02d] = 0x%04x", count++, reg_out.addr.to_uint(), reg_out.data.to_uint());
-            std::cout << buf << std::endl;
-        }        
-    }
     return 0;
     #else
     // ToDo: Fix IF

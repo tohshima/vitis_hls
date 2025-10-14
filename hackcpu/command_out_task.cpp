@@ -101,7 +101,7 @@ void command_out_task(
 	hls::stream<command_t>& command_out,
 	hls::stream<addr_t>& dispadr_out,
 	hls::stream<word_t>& dispdat_out,
-	hls::stream<axireg_data_t>& axireg_command_out,
+	hls::stream<axi_reg_t>& axireg_command_out,
 	hls::stream<char>& uart_out,
     hls::stream<bool>& reg_uart_disp_enable_read,
     hls::stream<ap_uint<1> >& dispflush_req,
@@ -110,7 +110,7 @@ void command_out_task(
 	#pragma HLS INTERFACE axis port=command_out depth=32
 	#pragma HLS INTERFACE axis port=dispadr_out depth=1
 	#pragma HLS INTERFACE axis port=dispdat_out depth=1
-	#pragma HLS INTERFACE axis port=axireg_command_out depth=1
+	#pragma HLS INTERFACE axis port=axireg_command_out depth=18
 	#pragma HLS INTERFACE axis port=uart_out depth=1
 	#pragma HLS INTERFACE axis port=reg_uart_disp_enable_read depth=1
 	#pragma HLS INTERFACE axis port=dispflush_req depth=1

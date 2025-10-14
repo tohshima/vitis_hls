@@ -7,13 +7,13 @@ static volatile word_t debug_command_ = 0;
 
 // convert sequence of characters via uart to command words, key input or interrupt signal.
 void command_in_task(
-	hls::stream<axireg_data_t>& axireg_command_in,
+	hls::stream<axi_reg_t>& axireg_command_in,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<command_t>& command_in,
 	hls::stream<word_t>& ext_key_in,
 	hls::stream<word_t>& ext_interrupt_in
 ) {
-	#pragma HLS INTERFACE axis port=axireg_command_in depth=1
+	#pragma HLS INTERFACE axis port=axireg_command_in depth=20
 	#pragma HLS INTERFACE axis port=uart_in depth=4
 	#pragma HLS INTERFACE axis port=command_in depth=32
 	#pragma HLS INTERFACE axis port=ext_key_in depth=1

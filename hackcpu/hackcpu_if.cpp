@@ -7,6 +7,7 @@
 #include "axireg_if.hpp"
 #include "hackcpu_if.hpp"
 
+
 static void sync_led_active(
     volatile ap_uint<1> btn_smp_clk,
     volatile ap_uint<1>& led_active_out,
@@ -94,8 +95,7 @@ static void check_buttons(
 }
 
 int hackcpu_if(
-    hls::stream<axireg_ext_t>& reg_ext_in,
-    hls::stream<axireg_ext_t>& reg_ext_out,
+    axi_regs_t& axi_regs,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,
@@ -107,10 +107,7 @@ int hackcpu_if(
 	volatile unsigned int *uart_reg,
     volatile ap_uint<8>& debug_phase
 ) {
-    #pragma HLS INTERFACE axis port=reg_ext_in depth=16   
-    #pragma HLS INTERFACE axis port=reg_ext_out depth=16
-
-    //#pragma HLS INTERFACE s_axilite register port=uart_start
+    #pragma HLS INTERFACE s_axilite port=axi_regs register   
 
     #pragma HLS INTERFACE ap_none port=button_in0    
     #pragma HLS INTERFACE ap_none port=button_in1    
@@ -140,23 +137,27 @@ int hackcpu_if(
 	
 	hls_thread_local hls::stream<bool> reg_uart_enable_read;
     #pragma HLS STREAM variable=reg_uart_enable_read depth=1
-	hls_thread_local hls::stream<axireg_data_t> reg_command_in_read;
-    #pragma HLS STREAM variable=reg_command_in_read depth=1	
-	hls_thread_local hls::stream<axireg_data_t> reg_command_out_write;
-    #pragma HLS STREAM variable=reg_command_out_write depth=1
+    hls_thread_local  hls::stream<bool> reg_uart_disp_enable_read;
+    #pragma HLS STREAM variable=reg_uart_disp_enable_read depth=1
+	hls_thread_local hls::stream<axi_reg_t> reg_command_in_read;
+    #pragma HLS STREAM variable=reg_command_in_read depth=20	
+	hls_thread_local hls::stream<axi_reg_t> reg_command_out_write;
+    #pragma HLS STREAM variable=reg_command_out_write depth=18
 		
-    start_tasks(led_active, uart_in, uart_out,
-        reg_ext_in, reg_ext_out, reg_uart_enable_read, reg_command_in_read, reg_command_out_write);
+    start_tasks(led_active, uart_in, uart_out, reg_uart_enable_read, reg_uart_disp_enable_read, reg_command_in_read, reg_command_out_write);
 
 #ifndef SIM_TATSKS
     bool sim_exit = false;
+#if !defined(__SYNTHESIS__)
+    do // for faster simulation
+#endif
     {
-        #pragma HLS PIPELINE
+        //#pragma HLS PIPELINE
         debug_phase = 0x10;
-        if (reg_uart_enable_read.read()) {
-            debug_phase = 0x11;
-            uart_if(uart_reg, uart_in, uart_out, sim_exit, debug_phase);
-        }
+        axireg_if(axi_regs, reg_uart_enable_read, reg_uart_disp_enable_read, reg_command_in_read, reg_command_out_write);
+
+        debug_phase = 0x11;
+        uart_if(uart_reg, uart_in, uart_out, axireg_is_uart_enable(&axi_regs), sim_exit, debug_phase);
 
         debug_phase = 0x13;
         sync_led_active(btn_smp_clk, led_active_out, led_active);
@@ -165,6 +166,9 @@ int hackcpu_if(
         check_buttons(button_in0, button_in1, button_in2, button_in3, 
             btn_smp_clk, led_btn_L_out, led_btn_R_out, uart_in, debug_phase);
     }
+#if !defined(__SYNTHESIS__)
+    while (!sim_exit && axireg_is_command_busy(&axi_regs)); // for faster simulation
+#endif
 #endif
     return sim_exit;
 }

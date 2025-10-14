@@ -7,8 +7,7 @@
 #include "hackcpu.hpp"
 
 int hackcpu_if(
-    hls::stream<axireg_ext_t>& reg_ext_in,
-    hls::stream<axireg_ext_t>& reg_ext_out,
+    axi_regs_t& axi_regs,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,

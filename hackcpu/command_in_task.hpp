@@ -8,7 +8,7 @@
 #include "hackcpu.hpp"
 
 void command_in_task(
-	hls::stream<axireg_data_t>& axireg_command_in,
+	hls::stream<axi_reg_t>& axireg_command_in,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<command_t>& command_in,
 	hls::stream<word_t>& ext_key_in,
