@@ -157,7 +157,7 @@ int hackcpu_if(
         axireg_if(axi_regs, reg_uart_enable_read, reg_uart_disp_enable_read, reg_command_in_read, reg_command_out_write);
 
         debug_phase = 0x11;
-        uart_if(uart_reg, uart_in, uart_out, axireg_is_uart_enable(&axi_regs), sim_exit, debug_phase);
+        uart_if(uart_reg, uart_in, uart_out, reg_uart_enable_read, sim_exit, debug_phase);
 
         debug_phase = 0x13;
         sync_led_active(btn_smp_clk, led_active_out, led_active);

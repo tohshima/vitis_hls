@@ -134,13 +134,14 @@ void uart_if(
 	volatile unsigned int *uart_reg,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
-    bool uart_if_enable,
+    hls::stream<bool>& reg_uart_enable_read,
     bool& sim_exit,
     volatile ap_uint<8>& debug_phase
 ) {
     #pragma HLS INTERFACE m_axi port=uart_reg offset=direct depth=16 // depthを正しく設定しないとCo-simがうまくいかない
 	#pragma HLS INTERFACE axis port=uart_in depth=32
 	#pragma HLS INTERFACE axis port=uart_out depth=4
+	#pragma HLS INTERFACE ap_fifo port=reg_uart_enable_read depth=1
     #ifdef USE_ZYNQ_PS_UART
     #pragma HLS INTERFACE s_axilite port=return
     #else
@@ -166,7 +167,7 @@ void uart_if(
 	} else {
 		//#pragma HLS DATAFLOW
 		//while (1) {
-            if (uart_if_enable) {
+            if (!reg_uart_enable_read.empty() && reg_uart_enable_read.read()) {
                 debug_phase = 0x20;
                 get_token(uart_reg, uart_in, sim_exit);
             }
