@@ -116,7 +116,7 @@ static void normal_operation(axi_regs_t* p_reg, int& reg_count) {
 
 void test_bench_axireg(axi_regs_t* p_reg) {
 
-    memset(p_reg, 0, sizeof(axi_regs_t));
+    //memset(p_reg, 0, sizeof(axi_regs_t));
     axireg_clear_uart_enable(p_reg);
     axireg_set_uart_disp_enable(p_reg);
     int reg_count = 0;
