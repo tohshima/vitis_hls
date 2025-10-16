@@ -2,6 +2,8 @@
 #ifndef __AXIREG_IF_HPP
 #define __AXIREG_IF_HPP
 
+#include <ap_int.h>
+#include <hls_stream.h>
 #include "axireg_if_def.hpp"
 
 void axireg_if(

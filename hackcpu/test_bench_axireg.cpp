@@ -1,14 +1,16 @@
 // test bench for hackcpu
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include "hackcpu_def.hpp" // Assuming the CPU function is in a file named cpu.h
+#ifdef VITIS_HLS_SIM
 #include <iostream>
 #include <bitset>
-#include <fstream>
-#include <string>
 #include <iomanip>
-#include <stdlib.h>
-#include "hackcpu.hpp" // Assuming the CPU function is in a file named cpu.h
-#ifdef VITIS_HLS_SIM
 #include <ap_int.h>
 #include "hackcpu_if.hpp"
+#else
+#include "xil_printf.h"
 #endif
 #include "axireg_if_def.hpp"
 #include "rom_pong.h"

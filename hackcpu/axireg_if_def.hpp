@@ -1,4 +1,4 @@
-// Hack CPU AXI register IF definition
+// Hack CPU AXI register IF public definition
 #ifndef __AXIREG_IF_DEF_HPP__
 #define __AXIREG_IF_DEF_HPP__
 
