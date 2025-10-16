@@ -32,7 +32,7 @@ static void _printline(const char* buf) {
 #endif
 }
 
-static void print_regs(const axi_regs_t* p_axi_regs, int& count) {
+static void print_regs(const volatile axi_regs_t* p_axi_regs, int& count) {
     char buf[256];
     ::sprintf(buf, "========== %d", count++);
     _printline(buf);
@@ -61,7 +61,7 @@ static void print_regs(const axi_regs_t* p_axi_regs, int& count) {
     _printline("");
 }
 
-static void execute_commannd(axi_regs_t* p_reg, axi_reg_t word, axi_reg_t length, const axi_reg_t* params, int& reg_count) {
+static void execute_commannd(volatile axi_regs_t* p_reg, axi_reg_t word, axi_reg_t length, const axi_reg_t* params, int& reg_count) {
     axireg_start_command(p_reg, word, length, params);
     do {
 #ifdef VITIS_HLS_SIM
@@ -86,13 +86,13 @@ static void execute_commannd(axi_regs_t* p_reg, axi_reg_t word, axi_reg_t length
     } while (!axireg_is_command_done(p_reg));
 }
 
-static void config_reset(axi_regs_t* p_reg, axi_reg_t config, int& reg_count) {
+static void config_reset(volatile axi_regs_t* p_reg, axi_reg_t config, int& reg_count) {
     axi_reg_t params[1];
     params[0] = config;
     execute_commannd(p_reg, SET_RESET_CONFIG, 1, params, reg_count);
 }
 
-static void load_rom(axi_regs_t* p_reg, const axi_reg_t* rom, int rom_length, int& reg_count) {
+static void load_rom(volatile axi_regs_t* p_reg, const axi_reg_t* rom, int rom_length, int& reg_count) {
     const int one_length = 16;
     int curr_pointer = 0;
     int length = 0;
@@ -110,11 +110,11 @@ static void load_rom(axi_regs_t* p_reg, const axi_reg_t* rom, int rom_length, in
     } while (length > 0);
 }
 
-static void normal_operation(axi_regs_t* p_reg, int& reg_count) {
+static void normal_operation(volatile axi_regs_t* p_reg, int& reg_count) {
     execute_commannd(p_reg, NORMAL_OPERATION, 0, NULL, reg_count);
 }
 
-void test_bench_axireg(axi_regs_t* p_reg) {
+void test_bench_axireg(volatile axi_regs_t* p_reg) {
 
     //memset(p_reg, 0, sizeof(axi_regs_t));
     axireg_clear_uart_enable(p_reg);
