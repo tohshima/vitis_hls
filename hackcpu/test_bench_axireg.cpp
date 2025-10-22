@@ -20,15 +20,15 @@ static void _print(const char* buf) {
 #ifdef VITIS_HLS_SIM
     std::cout << buf;
 #else
-    print(buf);
+    //print(buf);
 #endif
 }
 static void _printline(const char* buf) {
 #ifdef VITIS_HLS_SIM
     std::cout << buf << std::endl;
 #else
-    print(buf);
-    print("¥n");
+    //print(buf);
+    //print("¥n");
 #endif
 }
 

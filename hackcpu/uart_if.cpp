@@ -52,7 +52,8 @@ static void send_chars(volatile unsigned int *uart_reg, hls::stream<char>& uart_
 		uart_comm.write_data(uo, length);
 	}
 #else
-	for (int i = 0; i < 16; i++) {
+//	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < 2; i++) {
         #pragma HLS UNROLL
     	// TXFIFOが満杯でないか確認
         if (!uart_out.empty() && is_not_tx_fifo_full(uart_reg)) {

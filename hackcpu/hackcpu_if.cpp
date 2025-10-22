@@ -133,7 +133,7 @@ int hackcpu_if(
     #pragma HLS STREAM variable=uart_in depth=32
 
 	hls_thread_local hls::stream<char> uart_out;
-    #pragma HLS STREAM variable=uart_out depth=128
+    #pragma HLS STREAM variable=uart_out depth=2
 	
 	hls_thread_local hls::stream<bool> reg_uart_enable_read;
     #pragma HLS STREAM variable=reg_uart_enable_read depth=1
