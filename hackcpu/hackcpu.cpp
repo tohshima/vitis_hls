@@ -31,7 +31,8 @@ static void comp_core(word_t instruction, word_t x, word_t y, word_t &alu_out) {
 static void comp(word_t instruction, 
                  word_t A, word_t D,
                  word_t& alu_out) {
-#pragma HLS inline
+//#pragma HLS inline
+    #pragma HLS LATENCY min=1 max=2
     word_t x = D;
     word_t y = A;
     comp_core(instruction, x, y, alu_out);
@@ -44,7 +45,8 @@ static void compM(
     word_t ram[IRAM_SIZE],
     word_t &alu_out
 ) {
-    #pragma HLS inline
+//    #pragma HLS inline
+    #pragma HLS LATENCY min=1 max=2
     
     word_t x = D;
     word_t y = ram[A];
@@ -61,7 +63,9 @@ static void get_destination(
     word_t& outM, 
     addr_t addressM,
     hls::stream<addr_t>& periheral_waddr_out,
-    hls::stream<word_t>& periheral_wdata_out
+    hls::stream<word_t>& periheral_wdata_out,
+    word_t& key_input_val,
+    ap_uint<1>& key_input_flag
 ) {
 #pragma HLS inline
     if (instruction[3]) {
@@ -75,6 +79,11 @@ static void get_destination(
         write_out = 1;
     } else {
         write_out = 0;
+        if (key_input_flag) {
+            // key input update when it is not other memory cycle.
+            key_input_flag = 0;
+            ram[PERIPHERAL_KEYIN_ADDR] = key_input_val;
+        }
     }
     if (instruction[4]) D = alu_out;
     if (instruction[5]) A = alu_out;
@@ -129,6 +138,9 @@ static uint64_t cycle = 0;
 static uint64_t cycle_to_stop = 20; //0xFFFFFFFFFFFFFFFFull;
 static word_t break_condition_bitmap = 0; // BREAK_CONDITION_BIT_DISPOUT | BREAK_CONDITION_BIT_KEYIN; // obsolete
 static uint64_t break_cycle_interval = 0;
+static word_t key_input_val = 0;
+static ap_uint<1> key_input_flag = 0;
+
 
 // CPU function
 // ToDo: c-inst dual issue, dynamic dual issue mode, Xrom burst fetch
@@ -165,7 +177,7 @@ word_t cpu(
             #ifdef PIPELINE_II_1
             #pragma HLS PIPELINE II=1
             #else
-            #pragma HLS PIPELINE II=2
+            #pragma HLS PIPELINE II=10
             #endif
             //#pragma HLS DATAFLOW
 
@@ -179,7 +191,8 @@ word_t cpu(
                 word_t val = interrupt_in.read();
                 switch (val & INT_REASON_MASK) {
                 case INT_REASON_KEYIN:
-                    d_ram[PERIPHERAL_KEYIN_ADDR] = val & 0xFF;
+                    key_input_val = val & 0xFF;
+                    key_input_flag = 1;
                     break;
                 default:
                     break_reason = BREAK_REASON_EXT;
@@ -242,7 +255,8 @@ word_t cpu(
                     addressM = Regs.A;
                     get_destination(instruction, alu_out,
                         Regs.A, Regs.D, d_ram, write_out, outM, addressM,
-                        peripheral_waddr_out, peripheral_wdata_out);
+                        peripheral_waddr_out, peripheral_wdata_out,
+                        key_input_val, key_input_flag);
                     //disp_out_or_key_in_check(write_out, addressM, break_condition_bitmap,
                     //		instruction[12], break_reason);
 

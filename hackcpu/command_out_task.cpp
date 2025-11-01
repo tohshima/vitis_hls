@@ -11,6 +11,7 @@ static int make_hex_chars(
 	#pragma HLS INTERFACE axis port=uart_out depth=128
 
 	for (int i = 0; i < 4; i++) {
+        #pragma HLS PIPELINE off
 		char temp = ((hex_data >> (3 - i) * 4) & 0xF);
 		char hex_char = (temp <= 9) ? temp + '0' : temp - 10 + 'a';
 		uart_out.write(hex_char);
@@ -137,6 +138,7 @@ void command_out_task(
 
 		debug_phase_uot_ = 0xD2;
 		for (int i = 0; i < num_ret; i++) {
+            #pragma HLS PIPELINE off 
             command_t cw1 = command_out.read();
             word_t data = cw1.word;
             if (tag & CMDTAG_UART) {
