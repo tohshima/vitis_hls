@@ -95,7 +95,7 @@ static void check_buttons(
 }
 
 int hackcpu_if(
-    axi_regs_t& axi_regs,
+    hackcpu_regs_t& axi_regs,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,
@@ -139,9 +139,9 @@ int hackcpu_if(
     #pragma HLS STREAM variable=reg_uart_enable_read depth=1
     hls_thread_local  hls::stream<bool> reg_uart_disp_enable_read;
     #pragma HLS STREAM variable=reg_uart_disp_enable_read depth=1
-	hls_thread_local hls::stream<axi_reg_t> reg_command_in_read;
+	hls_thread_local hls::stream<hackcpu_reg_t> reg_command_in_read;
     #pragma HLS STREAM variable=reg_command_in_read depth=20	
-	hls_thread_local hls::stream<axi_reg_t> reg_command_out_write;
+	hls_thread_local hls::stream<hackcpu_reg_t> reg_command_out_write;
     #pragma HLS STREAM variable=reg_command_out_write depth=18
 		
     start_tasks(led_active, uart_in, uart_out, reg_uart_enable_read, reg_uart_disp_enable_read, reg_command_in_read, reg_command_out_write);

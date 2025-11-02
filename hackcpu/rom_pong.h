@@ -1,6 +1,6 @@
 // pong ROM
 #include "axireg_if_def.hpp"
-const axi_reg_t pong_rom_code[] = {
+const hackcpu_reg_t pong_rom_code[] = {
 0b0000000100000000,
 0b1110110000010000,
 0b0000000000000000,

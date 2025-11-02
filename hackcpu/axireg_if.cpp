@@ -7,11 +7,11 @@
 
 
 void axireg_if(
-    axi_regs_t& axi_regs,
+    hackcpu_regs_t& axi_regs,
     hls::stream<bool>& reg_uart_enable_read,
     hls::stream<bool>& reg_uart_disp_enable_read,
-    hls::stream<axi_reg_t>& reg_command_in_read,
-    hls::stream<axi_reg_t>& reg_command_out_write
+    hls::stream<hackcpu_reg_t>& reg_command_in_read,
+    hls::stream<hackcpu_reg_t>& reg_command_out_write
 ) {
     #pragma HLS INLINE
     //#pragma HLS PIPELINE II=1
@@ -26,10 +26,10 @@ void axireg_if(
             axireg_clear_command_start(&axi_regs);
             axireg_set_command_busy(&axi_regs);
             axireg_clear_command_done(&axi_regs);
-            axi_reg_t w = axi_regs.command_in_word;
-            axi_reg_t n = axi_regs.command_in_num_params;
+            hackcpu_reg_t w = axi_regs.command_in_word;
+            hackcpu_reg_t n = axi_regs.command_in_num_params;
             reg_command_in_read.write(w);
-            for (axi_reg_t i = 0; i < n; i++) {
+            for (hackcpu_reg_t i = 0; i < n; i++) {
                 #pragma HLS UNNROLL
                 reg_command_in_read.write(axi_regs.command_in_params[i]);
             }            
@@ -37,9 +37,9 @@ void axireg_if(
     } else {
         // WIP
         if (!reg_command_out_write.empty()) {
-            axi_reg_t n = reg_command_out_write.read();
+            hackcpu_reg_t n = reg_command_out_write.read();
             axi_regs.command_out_num_params = n;
-            for (axi_reg_t i = 0; i < sizeof(axi_regs.command_out_params)/sizeof(axi_regs.command_out_params[0]); i++) {
+            for (hackcpu_reg_t i = 0; i < sizeof(axi_regs.command_out_params)/sizeof(axi_regs.command_out_params[0]); i++) {
                 #pragma HLS UNROLL
                 if (i < n) {
                     axi_regs.command_out_params[i] = reg_command_out_write.read();
@@ -47,7 +47,7 @@ void axireg_if(
                     axi_regs.command_out_params[i] = 0;
                 }
             }
-            axi_reg_t s = reg_command_out_write.read();
+            hackcpu_reg_t s = reg_command_out_write.read();
             axi_regs.command_out_status = s;
             axireg_clear_command_busy(&axi_regs);
             axireg_set_command_done(&axi_regs);

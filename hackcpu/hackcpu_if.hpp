@@ -7,7 +7,7 @@
 #include "hackcpu.hpp"
 
 int hackcpu_if(
-    axi_regs_t& axi_regs,
+    hackcpu_regs_t& axi_regs,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,

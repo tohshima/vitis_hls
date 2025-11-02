@@ -32,7 +32,7 @@ static void _printline(const char* buf) {
 #endif
 }
 
-static void print_regs(const volatile axi_regs_t* p_axi_regs, int& count) {
+static void print_regs(const volatile hackcpu_regs_t* p_axi_regs, int& count) {
     char buf[256];
     ::sprintf(buf, "========== %d", count++);
     _printline(buf);
@@ -44,7 +44,7 @@ static void print_regs(const volatile axi_regs_t* p_axi_regs, int& count) {
     _printline(buf);
     ::sprintf(buf, "  0x0a: CMD_IN_PARAMS  = 0x%04x", p_axi_regs->command_in_params[0]);
     _print(buf);
-    for (axi_reg_t i = 1; i < p_axi_regs->command_in_num_params; i++) {
+    for (hackcpu_reg_t i = 1; i < p_axi_regs->command_in_num_params; i++) {
         ::sprintf(buf, " 0x%04x", p_axi_regs->command_in_params[i]);
         _print(buf);
     }
@@ -53,7 +53,7 @@ static void print_regs(const volatile axi_regs_t* p_axi_regs, int& count) {
     _printline(buf);
     ::sprintf(buf, "  0x32: CMD_OUT_PARAMS = 0x%04x", p_axi_regs->command_out_params[0]);
     _print(buf);
-    for (axi_reg_t i = 1; i < p_axi_regs->command_out_num_params; i++) {
+    for (hackcpu_reg_t i = 1; i < p_axi_regs->command_out_num_params; i++) {
         ::sprintf(buf, " 0x%04x", p_axi_regs->command_out_params[i]);
         _print(buf);
     }
@@ -61,7 +61,7 @@ static void print_regs(const volatile axi_regs_t* p_axi_regs, int& count) {
     _printline("");
 }
 
-static void execute_commannd(volatile axi_regs_t* p_reg, axi_reg_t word, axi_reg_t length, const axi_reg_t* params, int& reg_count) {
+static void execute_commannd(volatile hackcpu_regs_t* p_reg, hackcpu_reg_t word, hackcpu_reg_t length, const hackcpu_reg_t* params, int& reg_count) {
     axireg_start_command(p_reg, word, length, params);
     do {
 #ifdef VITIS_HLS_SIM
@@ -86,20 +86,20 @@ static void execute_commannd(volatile axi_regs_t* p_reg, axi_reg_t word, axi_reg
     } while (!axireg_is_command_done(p_reg));
 }
 
-static void config_reset(volatile axi_regs_t* p_reg, axi_reg_t config, int& reg_count) {
-    axi_reg_t params[1];
+static void config_reset(volatile hackcpu_regs_t* p_reg, hackcpu_reg_t config, int& reg_count) {
+    hackcpu_reg_t params[1];
     params[0] = config;
     execute_commannd(p_reg, SET_RESET_CONFIG, 1, params, reg_count);
 }
 
-static void load_rom(volatile axi_regs_t* p_reg, const axi_reg_t* rom, int rom_length, int& reg_count) {
+static void load_rom(volatile hackcpu_regs_t* p_reg, const hackcpu_reg_t* rom, int rom_length, int& reg_count) {
     const int one_length = 16;
     int curr_pointer = 0;
     int length = 0;
     do {
         length = (rom_length - curr_pointer) > one_length? one_length: (rom_length - curr_pointer);
         if (length > 0) {
-            axi_reg_t params[one_length+2];
+            hackcpu_reg_t params[one_length+2];
             params[0] = curr_pointer;
             params[1] = length;
             for (int i = 0; i < length; i++) {
@@ -110,11 +110,11 @@ static void load_rom(volatile axi_regs_t* p_reg, const axi_reg_t* rom, int rom_l
     } while (length > 0);
 }
 
-static void normal_operation(volatile axi_regs_t* p_reg, int& reg_count) {
+static void normal_operation(volatile hackcpu_regs_t* p_reg, int& reg_count) {
     execute_commannd(p_reg, NORMAL_OPERATION, 0, NULL, reg_count);
 }
 
-void test_bench_axireg(volatile axi_regs_t* p_reg) {
+void test_bench_axireg(volatile hackcpu_regs_t* p_reg) {
 
     //memset(p_reg, 0, sizeof(axi_regs_t));
     axireg_clear_uart_enable(p_reg);
