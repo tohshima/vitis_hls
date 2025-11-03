@@ -16,8 +16,8 @@ void start_tasks(
 	hls::stream<char>& uart_out,
     hls::stream<bool>& reg_uart_enable_read,
     hls::stream<bool>& reg_uart_disp_enable_read,
-    hls::stream<axi_reg_t>& reg_command_in_read,
-    hls::stream<axi_reg_t>& reg_command_out_write
+    hls::stream<hackcpu_reg_t>& reg_command_in_read,
+    hls::stream<hackcpu_reg_t>& reg_command_out_write
 ) {
     #pragma HLS INLINE
 
