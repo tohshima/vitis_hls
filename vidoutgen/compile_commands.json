@@ -1,0 +1,26 @@
+[
+  {
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/vidoutgen",
+    "arguments": [
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
+      "-fhls",
+      "-hls-syn-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/common/technology/autopilot",
+      "",
+      "-c",
+      "/home/tohshima/repos/vitis_hls/work/dev/vidoutgen/vidoutgen.cpp"
+    ],
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/vidoutgen/vidoutgen.cpp"
+  },
+  {
+    "directory": "/home/tohshima/repos/vitis_hls/work/dev/vidoutgen",
+    "arguments": [
+      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
+      "-fhls-tb",
+      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
+      "",
+      "-c",
+      "/home/tohshima/repos/vitis_hls/work/dev/vidoutgen/testbench.cpp"
+    ],
+    "file": "/home/tohshima/repos/vitis_hls/work/dev/vidoutgen/testbench.cpp"
+  }
+]
