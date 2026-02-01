@@ -20,4 +20,5 @@
 .vitisWorkspace.json
 .theia
 .wsdata
-
+.jou
+.log
