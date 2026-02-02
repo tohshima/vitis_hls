@@ -11,6 +11,8 @@
 #include "start_tasks.hpp"
 
 void start_tasks(
+	hls::stream<addr_t>& dispadr_out_fw,
+	hls::stream<word_t>& dispdat_out_fw,
 	hls::stream< ap_uint<1> >& led_active,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
@@ -21,6 +23,8 @@ void start_tasks(
 ) {
     #pragma HLS INLINE
 
+	#pragma HLS INTERFACE axis port=dispadr_out_fw depth=16
+	#pragma HLS INTERFACE axis port=dispdat_out_fw depth=16
     #pragma HLS INTERFACE axis port=led_active depth=1
     #pragma HLS INTERFACE ap_fifo port=reg_uart_enable_read depth=1
     #pragma HLS INTERFACE ap_fifo port=reg_uart_disp_enable_read depth=1
@@ -67,5 +71,5 @@ void start_tasks(
     //hls_thread_local hls::task itt(interrupt_in_task, ext_interrupt_in, interrupt_in);
     //hls_thread_local hls::task pwt(peripheral_write_task, peripheral_waddr_out, peripheral_wdata_out, dispadr_out, dispdat_out);
     //hls_thread_local hls::task prt(peripheral_read_task, ext_key_in, peripheral_raddr_out, peripheral_rdata_in);
-	hls_thread_local hls::task cot(command_out_task, command_out, dispadr_out, dispdat_out, reg_command_out_write, uart_out, reg_uart_disp_enable_read, dispflush_req, dispflush_ack);
+	hls_thread_local hls::task cot(command_out_task, command_out, dispadr_out, dispdat_out, dispadr_out_fw, dispdat_out_fw, reg_command_out_write, uart_out, reg_uart_disp_enable_read, dispflush_req, dispflush_ack);
 }

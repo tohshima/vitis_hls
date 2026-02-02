@@ -8,6 +8,8 @@
 #include "axireg_if.hpp"
 
 void start_tasks(
+	hls::stream<addr_t>& dispadr_out_fw,
+	hls::stream<word_t>& dispdat_out_fw,
 	hls::stream< ap_uint<1> >& led_active,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,

@@ -84,7 +84,7 @@ void read_rom_file_to_command(
 int main() {
     #ifdef USE_HACKCPU_UART
 
-    axi_regs_t axi_regs;
+    hackcpu_regs_t axi_regs = {0};
 
     test_bench_axireg(&axi_regs);
 
