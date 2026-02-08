@@ -295,7 +295,7 @@ static inline void vidoutgen_cls(vidoutgen_regs_t* p_reg) {
 static inline void vidoutgen_quick_test(vidoutgen_regs_t* p_reg, uint64_t* p_dram, hls::stream< hackcpu_video_t >& video_in_stream) {
 #else
 static inline void vidoutgen_quick_test(uint32_t reg_address) {
-    volatile vidoutgen_regs_t* p_reg = (volatile vidoutgen_regs_t*)reg_address;
+    vidoutgen_regs_t* p_reg = (vidoutgen_regs_t*)reg_address;
 #endif
     vidoutgen_set_bg_width(p_reg, 1280);
     vidoutgen_set_bg_height(p_reg, 720);
@@ -313,8 +313,11 @@ static inline void vidoutgen_quick_test(uint32_t reg_address) {
     vidoutgen_set_buf0_offset_addr(p_reg, 0x14000000ull);
 #endif
     vidoutgen_set_control_enable(p_reg);
-
+#ifdef VITIS_HLS_SIM
     vidoutgen_cls(p_reg, p_dram, video_in_stream);
+#else
+    vidoutgen_cls(p_reg);
+#endif
 }
 
 #ifdef __cplusplus
