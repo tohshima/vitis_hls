@@ -116,8 +116,13 @@ void vidoutgen(
                 const uint32_t fgc1_i = vidoutgen_conv_color_to_uint(&fgc1);
 
                 const hackcpu_video_t vd = video_in_stream.read();
-                const uint64_t addr64 = (vd.addr * sizeof(vd.data)*8 * sizeof(vidoutgen_rgba_t) + vidoutgen_get_buf0_offset_addr(&regs))
-                                    / sizeof(uint64_t);
+                const uint16_t bg_w = vidoutgen_get_bg_width(&regs);
+                const uint16_t fg_offset_x = vidoutgen_get_fg_offset_x(&regs);
+                const uint16_t fg_offset_y = vidoutgen_get_fg_offset_y(&regs);
+                const uint16_t fg_x = vd.addr*sizeof(vd.data)*8 & 0x1FF; // % 512;
+                const uint16_t fg_y = vd.addr*sizeof(vd.data)*8 >> 9;    // / 512;
+                const uint64_t addr64 = ((bg_w*(fg_offset_y + fg_y) + fg_offset_x + fg_x) * sizeof(vidoutgen_rgba_t) + 
+                                            vidoutgen_get_buf0_offset_addr(&regs))/ sizeof(uint64_t);
                 const uint16_t repeat = sizeof(vd.data)*8 *sizeof(vidoutgen_rgba_t)/sizeof(uint64_t);
                 for (uint16_t i = 0; i < repeat; i++) {
                     uint32_t p0 = (vd.data >> (2*i)) & 0x1;
