@@ -142,6 +142,7 @@ static inline hackcpu_reg_t axireg_get_command_result(hackcpu_regs_t* p_reg, hac
 #include <iostream>
 #include <bitset>
 #include <iomanip>
+#include <fstream>
 #include <ap_int.h>
 #include "hackcpu_if.hpp"
 #else
@@ -196,14 +197,63 @@ static inline void print_regs(hackcpu_regs_t* p_axi_regs, int* p_count) {
     _printline("");
 }
 
+#ifdef VITIS_HLS_SIM
+#include "../vidoutgen/vidoutgen_def.hpp"
+static void save_stream_to_header(hls::stream<hackcpu_video_t>& stream, 
+                           const char* filename,
+                           const char* array_name = "stream_data") {
+    std::vector<hackcpu_video_t> buffer;
+    
+    // ストリームからすべてのデータを読み出し
+    while (!stream.empty()) {
+        buffer.push_back(stream.read());
+    }
+    
+    // ヘッダファイルに書き出し
+    std::ofstream outfile(filename);
+    
+    outfile << "#ifndef STREAM_DATA_H\n";
+    outfile << "#define STREAM_DATA_H\n\n";
+    outfile << "#include <ap_int.h>\n";
+    outfile << "#include <hls_stream.h>\n\n";
+        
+    // データ配列
+    outfile << "const hackcpu_video_t " << array_name << "[] = {\n";
+    
+    for (size_t i = 0; i < buffer.size(); i++) {
+        outfile << "    {0x" << std::hex << std::setw(4) << std::setfill('0') 
+                << buffer[i].addr << ", " 
+                << "0x" << std::hex << std::setw(4) << std::setfill('0')
+                << buffer[i].data << "}";
+        
+        if (i < buffer.size() - 1) {
+            outfile << ",\n";
+        } else {
+            outfile << "\n";
+        }
+    }
+    
+    outfile << "};\n\n";
+    outfile << "const int " << array_name << "_size = " << std::dec << buffer.size() << ";\n\n";
+    outfile << "#endif // STREAM_DATA_H\n";
+    
+    outfile.close();
+    
+    std::cout << "Saved " << buffer.size() << " elements to " << filename << std::endl;
+}
+#endif // #ifdef VITIS_HLS_SIM
+
+#ifdef VITIS_HLS_SIM
+static hls::stream<hackcpu_video_t> video_stream;
+#endif
+
 static inline void execute_commannd(hackcpu_regs_t* p_reg, hackcpu_reg_t word, hackcpu_reg_t length, const hackcpu_reg_t* params, int* p_reg_count) {
     axireg_start_command(p_reg, word, length, params);
     do {
 #ifdef VITIS_HLS_SIM
         extern int hackcpu_if(
             hackcpu_regs_t& axi_regs,
-            hls::stream<addr_t>& dispadr_out_fw,
-            hls::stream<word_t>& dispdat_out_fw,
+            hls::stream< hackcpu_video_t >& video_stream,
             volatile ap_uint<1> button_in0,
             volatile ap_uint<1> button_in1,
             volatile ap_uint<1> button_in2,
@@ -225,12 +275,10 @@ static inline void execute_commannd(hackcpu_regs_t* p_reg, hackcpu_reg_t word, h
         volatile ap_uint<1> led_active_out = 0;
         volatile ap_uint<8> debug_phase = 0;
         volatile unsigned int uart_reg[UART_REG_SIZE] = {0};
-        hls::stream<addr_t> dispadr_out_fw;
-        hls::stream<word_t> dispdat_out_fw;
         print_regs(p_reg, p_reg_count);
         hackcpu_if(
             *p_reg,
-            dispadr_out_fw, dispdat_out_fw,
+            video_stream,
             button_in0, button_in1, button_in2, button_in3,
             btn_smp_clk, led_btn_L_out, led_btn_R_out, led_active_out,
             uart_reg, debug_phase);
@@ -267,19 +315,26 @@ static inline void normal_operation(hackcpu_regs_t* p_reg, int* p_reg_count) {
     execute_commannd(p_reg, NORMAL_OPERATION, 0, NULL, p_reg_count);
 }
 
+#ifdef VITIS_HLS_SIM
+static inline void test_bench_axireg(hackcpu_regs_t* p_reg) {
+#else
 static inline void test_bench_axireg(uint32_t reg_addr) {
     volatile hackcpu_regs_t* p_reg = (volatile hackcpu_regs_t*)reg_addr;
+#endif
     //memset(p_reg, 0, sizeof(axi_regs_t));
     axireg_clear_uart_enable(p_reg);
-    axireg_set_uart_disp_enable(p_reg);
+    //axireg_set_uart_disp_enable(p_reg);
     int reg_count = 0;
 
     // Reset
     config_reset(p_reg, RESET_BIT_RESET | RESET_BIT_HALT, &reg_count);
-    config_reset(p_reg, RESET_BIT_HALT, reg_count);
+    config_reset(p_reg, RESET_BIT_HALT, &reg_count);
 
     load_rom(p_reg, pong_rom_code, sizeof(pong_rom_code)/sizeof(pong_rom_code[0]), &reg_count);
     normal_operation(p_reg, &reg_count);
+#ifdef VITIS_HLS_SIM
+    save_stream_to_header(video_stream, "../../../../../vidoutgen/video_stream.hpp");
+#endif
 }
 #endif // #if !defined(__SYNTHESIS__)
 #endif //  __AXIREG_IF_DEF_HPP__

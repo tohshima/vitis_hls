@@ -115,18 +115,6 @@
       "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
       "-DVITIS_HLS_SIM -DUSE_HACKCPU_UART -DUSE_ZYNQ_PS_UART -DUSE_PYNQ_BUTTON",
       "-c",
-      "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench_axireg.cpp"
-    ],
-    "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench_axireg.cpp"
-  },
-  {
-    "directory": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu_axireg",
-    "arguments": [
-      "/tools/Xilinx/Vitis_HLS/2024.1/vcxx/libexec/clang++",
-      "-fhls-tb",
-      "-hls-sim-headers-dir=/tools/Xilinx/Vitis_HLS/2024.1/include",
-      "-DVITIS_HLS_SIM -DUSE_HACKCPU_UART -DUSE_ZYNQ_PS_UART -DUSE_PYNQ_BUTTON",
-      "-c",
       "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench.cpp"
     ],
     "file": "/home/tohshima/repos/vitis_hls/work/dev/hackcpu/test_bench.cpp"

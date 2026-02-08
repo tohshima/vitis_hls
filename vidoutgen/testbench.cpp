@@ -2,43 +2,52 @@
 #include <ap_int.h>
 #include <hls_stream.h>
 #include "vidoutgen.hpp"
+#include "gif.h" // https://github.com/charlietangora/gif-h.git
+#include "video_stream.hpp"
 
-//static uint64_t dram[1280*720*4/8];
-static uint64_t dram[32*4*4/8];
+static uint64_t video_frame[MAX_WIDTH*MAX_HEIGHT*sizeof(vidoutgen_rgba_t)/sizeof(uint64_t)+0x1000];
+static hls::stream< hackcpu_video_t > video_in_stream;
+
 
 int main() {
 
     vidoutgen_regs_t regs;
-    hls::stream< vidoutgen_rgb_t > video_out_stream;
-    ap_uint<10> debug_vcounter;
-    ap_uint<1> debug_data_in;
-    ap_uint<1> debug_data_out;
+    vidoutgen_quick_test(&regs, video_frame, video_in_stream);
+    // Just CLS was executed in case of simulation
 
-    regs.bg_col_b = 0x11;
-    regs.bg_col_g = 0x22;
-    regs.bg_col_r = 0x33;
-    regs.bg_height = 4;
-    regs.bg_width = 16;
-    regs.fg_height = 2;
-    regs.fg_width = 8;
-    regs.fg_offset_x = 4;
-    regs.fg_offset_y = 1;
-    regs.fg_col0_a = 0x00;
-    regs.fg_col0_b = 0xAA;
-    regs.fg_col0_g = 0xBB;
-    regs.fg_col0_r = 0xCC;
-    regs.control = 3;
-    regs.buf0_addr_low = 0x0;
-    regs.buf0_addr_high = 0;
+    // Create a gif
+    uint32_t width = 1280;
+    uint32_t height = 720;
+    uint32_t delay = 2;
+    int32_t bitDepth = 8;
+    bool dither = false;
+    GifWriter writer = {};
+    GifBegin( &writer, "vidoutgen.gif", width, height, delay, bitDepth, dither );
+    // Convert Initial display
+    GifWriteFrame( &writer, (const uint8_t*)video_frame, width, height, delay, bitDepth, dither );
 
-    vidoutgen(
-        regs,
-        dram
-        //hls::stream< hackcpu_video_t >& video_in_stream,
-        //video_out_stream//,
-        //debug_vcounter,
-        //debug_data_in,
-        //debug_data_out
-    );
+    // make gif animation
+    const int num_of_frames = 600;
+    const int num_of_stream_input_per_frame = stream_data_size / num_of_frames;
+
+    int stream_index = 0;
+    for (int f = 0; f < num_of_frames; f++) {
+        for (int s = 0; s < num_of_stream_input_per_frame; s++) {
+            video_in_stream.write(stream_data[stream_index++]);
+            vidoutgen_call_top(&regs, video_frame, video_in_stream);
+        }
+        GifWriteFrame( &writer, (const uint8_t*)video_frame, width, height, delay, bitDepth, dither );
+        std::cout << "Output #" << f << " frame. si = " << stream_index << "." << std::endl;
+    }
+    const int residual_frames = stream_data_size - num_of_frames * num_of_stream_input_per_frame;
+    if (residual_frames > 0) {
+        for (int s = 0; s < residual_frames; s++) {
+            video_in_stream.write(stream_data[stream_index++]);
+            vidoutgen_call_top(&regs, video_frame, video_in_stream);
+        }
+        GifWriteFrame( &writer, (const uint8_t*)video_frame, width, height, delay, bitDepth, dither );
+        std::cout << "Output #" << num_of_frames-1 << " frame. si = " << stream_index << "." << std::endl;
+    }
+
     return 0;
 }

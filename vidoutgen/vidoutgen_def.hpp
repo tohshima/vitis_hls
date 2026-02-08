@@ -265,8 +265,38 @@ static inline uint64_t vidoutgen_get_buf0_offset_addr(volatile vidoutgen_regs_t*
     return ((uint64_t)p_reg->buf0_addr_high << 32) + (uint64_t)p_reg->buf0_addr_low;
 }
 
-static void vidoutgen_quick_test(uint32_t reg_address) {
+#ifdef VITIS_HLS_SIM
+static inline void vidoutgen_call_top(vidoutgen_regs_t* p_reg, uint64_t* p_dram, hls::stream< hackcpu_video_t >& video_in_stream) {
+    extern void vidoutgen(
+        vidoutgen_regs_t& regs,
+        uint64_t* p_dram,
+        hls::stream< hackcpu_video_t >& video_in_stream);
+
+    vidoutgen(*p_reg, p_dram, video_in_stream);
+}
+#endif
+
+#ifdef VITIS_HLS_SIM
+static inline void vidoutgen_cls(vidoutgen_regs_t* p_reg, uint64_t* p_dram, hls::stream< hackcpu_video_t >& video_in_stream) {
+#else
+static inline void vidoutgen_cls(vidoutgen_regs_t* p_reg) {
+#endif
+    vidoutgen_set_control_cls(p_reg);
+#ifdef VITIS_HLS_SIM
+    vidoutgen_call_top(p_reg, p_dram, video_in_stream);
+#else 
+    for (volatile int i = 0; i < 1000000; i++) {}
+#endif
+    vidoutgen_clear_control_cls(p_reg);
+
+}
+
+#ifdef VITIS_HLS_SIM
+static inline void vidoutgen_quick_test(vidoutgen_regs_t* p_reg, uint64_t* p_dram, hls::stream< hackcpu_video_t >& video_in_stream) {
+#else
+static inline void vidoutgen_quick_test(uint32_t reg_address) {
     volatile vidoutgen_regs_t* p_reg = (volatile vidoutgen_regs_t*)reg_address;
+#endif
     vidoutgen_set_bg_width(p_reg, 1280);
     vidoutgen_set_bg_height(p_reg, 720);
     vidoutgen_rgb_t bg_col = {0x11, 0x11, 0x11};
@@ -277,13 +307,14 @@ static void vidoutgen_quick_test(uint32_t reg_address) {
     vidoutgen_set_fg_offset_y(p_reg, (720-256)/2);
     vidoutgen_rgba_t fg_col0 = {0xFF, 0xFF, 0xFF, 0x00};
     vidoutgen_set_fg_color0(p_reg, &fg_col0);
-
+#ifdef VITIS_HLS_SIM
+    vidoutgen_set_buf0_offset_addr(p_reg, 0x00000000ull);
+#else
     vidoutgen_set_buf0_offset_addr(p_reg, 0x14000000ull);
-
+#endif
     vidoutgen_set_control_enable(p_reg);
-    vidoutgen_set_control_cls(p_reg);    
-    for (volatile int i = 0; i < 1000000; i++) {}
-    vidoutgen_clear_control_cls(p_reg);    
+
+    vidoutgen_cls(p_reg, p_dram, video_in_stream);
 }
 
 #ifdef __cplusplus
