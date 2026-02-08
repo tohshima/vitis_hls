@@ -96,8 +96,7 @@ static void check_buttons(
 
 int hackcpu_if(
     hackcpu_regs_t& axi_regs,
-	hls::stream<addr_t>& dispadr_out_fw,
-	hls::stream<word_t>& dispdat_out_fw,
+	hls::stream< hackcpu_video_t >& video_stream,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,
@@ -110,8 +109,7 @@ int hackcpu_if(
     volatile ap_uint<8>& debug_phase
 ) {
     #pragma HLS INTERFACE s_axilite port=axi_regs register   
-	#pragma HLS INTERFACE axis port=dispadr_out_fw depth=16
-	#pragma HLS INTERFACE axis port=dispdat_out_fw depth=16
+	#pragma HLS INTERFACE axis port=video_stream depth=16
 
     #pragma HLS INTERFACE ap_none port=button_in0    
     #pragma HLS INTERFACE ap_none port=button_in1    
@@ -148,7 +146,7 @@ int hackcpu_if(
 	hls_thread_local hls::stream<hackcpu_reg_t> reg_command_out_write;
     #pragma HLS STREAM variable=reg_command_out_write depth=18
 		
-    start_tasks(dispadr_out_fw, dispdat_out_fw, 
+    start_tasks(video_stream, 
         led_active, uart_in, uart_out, reg_uart_enable_read, reg_uart_disp_enable_read, 
         reg_command_in_read, reg_command_out_write);
 

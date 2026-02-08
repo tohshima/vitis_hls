@@ -5,12 +5,12 @@
 #include <ap_int.h>
 #include <hls_stream.h>
 #include "axireg_if.hpp"
+#include "../vidoutgen/vidoutgen_def.hpp"
 #include "hackcpu.hpp"
 
 int hackcpu_if(
     hackcpu_regs_t& axi_regs,
-	hls::stream<addr_t>& dispadr_out_fw,
-	hls::stream<word_t>& dispdat_out_fw,
+	hls::stream< hackcpu_video_t >& video_stream,
     volatile ap_uint<1> button_in0,
     volatile ap_uint<1> button_in1,
     volatile ap_uint<1> button_in2,

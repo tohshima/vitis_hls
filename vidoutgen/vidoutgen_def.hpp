@@ -222,6 +222,17 @@ static inline void vidoutgen_get_fg_color0(volatile vidoutgen_regs_t* p_reg, vid
     p_color->b = p_reg->fg_col0_b;
     p_color->a = p_reg->fg_col0_a;
 }
+static inline uint32_t vidoutgen_conv_color_to_uint(vidoutgen_rgba_t* p_color) {
+    #ifdef __SYNTHESIS__
+    #pragma HLS INLINE
+    #endif
+    uint32_t res = 0;
+    res = p_color->r;
+    res += ((uint32_t)p_color->g << 8);
+    res += ((uint32_t)p_color->b << 16);
+    res += ((uint32_t)p_color->a << 24);
+    return res;
+}
 static inline void vidoutgen_set_fg_color1(volatile vidoutgen_regs_t* p_reg, vidoutgen_rgba_t* p_color) {
     #ifdef __SYNTHESIS__
     #pragma HLS INLINE
@@ -255,7 +266,7 @@ static inline uint64_t vidoutgen_get_buf0_offset_addr(volatile vidoutgen_regs_t*
 }
 
 static void vidoutgen_quick_test(uint32_t reg_address) {
-    vidoutgen_regs_t* p_reg = (vidoutgen_regs_t*)reg_address;
+    volatile vidoutgen_regs_t* p_reg = (volatile vidoutgen_regs_t*)reg_address;
     vidoutgen_set_bg_width(p_reg, 1280);
     vidoutgen_set_bg_height(p_reg, 720);
     vidoutgen_rgb_t bg_col = {0x11, 0x11, 0x11};
@@ -271,6 +282,8 @@ static void vidoutgen_quick_test(uint32_t reg_address) {
 
     vidoutgen_set_control_enable(p_reg);
     vidoutgen_set_control_cls(p_reg);    
+    for (volatile int i = 0; i < 1000000; i++) {}
+    vidoutgen_clear_control_cls(p_reg);    
 }
 
 #ifdef __cplusplus

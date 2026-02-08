@@ -8,8 +8,8 @@
 
 void vidoutgen(
     vidoutgen_regs_t& regs,
-    uint64_t* p_dram
-    //hls::stream< hackcpu_video_t >& video_in_stream,
+    uint64_t* p_dram,
+    hls::stream< hackcpu_video_t >& video_in_stream
     //hls::stream< vidoutgen_rgb_t >& video_out_stream//,
     //ap_uint<10>& debug_vcounter,
     //ap_uint<1>& debug_data_in,

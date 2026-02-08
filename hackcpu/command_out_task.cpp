@@ -102,8 +102,7 @@ void command_out_task(
 	hls::stream<command_t>& command_out,
 	hls::stream<addr_t>& dispadr_out,
 	hls::stream<word_t>& dispdat_out,
-	hls::stream<addr_t>& dispadr_out_fw,
-	hls::stream<word_t>& dispdat_out_fw,
+	hls::stream< hackcpu_video_t >& video_stream,
 	hls::stream<hackcpu_reg_t>& axireg_command_out,
 	hls::stream<char>& uart_out,
     hls::stream<bool>& reg_uart_disp_enable_read,
@@ -113,8 +112,7 @@ void command_out_task(
 	#pragma HLS INTERFACE axis port=command_out depth=32
 	#pragma HLS INTERFACE axis port=dispadr_out depth=1
 	#pragma HLS INTERFACE axis port=dispdat_out depth=1
-	#pragma HLS INTERFACE axis port=dispadr_out_fw depth=16
-	#pragma HLS INTERFACE axis port=dispdat_out_fw depth=16
+	#pragma HLS INTERFACE axis port=video_stream depth=16
 	#pragma HLS INTERFACE axis port=axireg_command_out depth=18
 	#pragma HLS INTERFACE axis port=uart_out depth=1
 	#pragma HLS INTERFACE axis port=reg_uart_disp_enable_read depth=1
@@ -128,11 +126,11 @@ void command_out_task(
         if (reg_uart_disp_enable_read.read()) {
     		make_disp_out(addrM, dataM, uart_out);
         }
-        if (!dispadr_out_fw.full()) {
-            dispadr_out_fw.write(addrM-0x4000);
-        }
-        if (!dispdat_out_fw.full()) {
-            dispdat_out_fw.write(dataM);
+        if (!video_stream.full()) {
+            hackcpu_video_t v;
+            v.addr = addrM-0x4000;
+            v.data = dataM;
+            video_stream.write(v);
         }
 	} else if (!command_out.empty()) {
 		debug_phase_uot_ = 0xD0;

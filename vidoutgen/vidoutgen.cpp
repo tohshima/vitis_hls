@@ -2,6 +2,7 @@
 #include <hls_stream.h>
 #include <cstring>
 #include "vidoutgen.hpp"
+#include "vidoutgen_def.hpp"
 
 
 static inline uint64_t combine_2pix(vidoutgen_rgba_t& col0, vidoutgen_rgba_t& col1) {
@@ -9,6 +10,13 @@ static inline uint64_t combine_2pix(vidoutgen_rgba_t& col0, vidoutgen_rgba_t& co
            ((uint64_t)col0.a << 24) + ((uint64_t)col0.b << 16) + ((uint64_t)col0.g <<  8) + ((uint64_t)col0.r <<  0);
 }
 
+static inline void copy_line(uint64_t* p_dram, uint64_t* p_buf, uint64_t addr64, int repeat) {
+    // バースト書き込み
+    for (int i = 0; i < repeat; i++) {
+    #pragma HLS PIPELINE II=1
+        p_dram[addr64 + i] = p_buf[i];
+    }     
+}
 static inline void make_hline(uint64_t* p_dram, uint64_t* p_buf, uint64_t addr64, uint16_t width, vidoutgen_rgba_t& col) {
     // width in unit of 2pix
     // まずバッファを初期化
@@ -18,19 +26,15 @@ static inline void make_hline(uint64_t* p_dram, uint64_t* p_buf, uint64_t addr64
         #pragma HLS PIPELINE II=1
         p_buf[i] = data;
     }
-        
-    // バースト書き込み
-    for (int i = 0; i < repeat; i++) {
-    #pragma HLS PIPELINE II=1
-        p_dram[addr64 + i] = p_buf[i];
-    }     
+    copy_line(p_dram, p_buf, addr64, repeat);   
 }
 
 #define BUF_SIZE (MAX_WIDTH*sizeof(vidoutgen_rgba_t)/sizeof(uint64_t))
 
 void vidoutgen(
-    vidoutgen_regs_t& regs,    
-    uint64_t* p_dram
+    vidoutgen_regs_t& regs,
+    uint64_t* p_dram,
+    hls::stream< hackcpu_video_t >& video_in_stream
 ) {
     #pragma HLS INTERFACE s_axilite port=regs register   
     #pragma HLS INTERFACE m_axi port=p_dram offset=direct \
@@ -43,7 +47,7 @@ void vidoutgen(
     //#pragma HLS INTERFACE ap_none port=head_addr
     //#pragma HLS INTERFACE ap_none port=h
 
-	//#pragma HLS INTERFACE axis port=video_in_stream depth=16
+	#pragma HLS INTERFACE axis port=video_in_stream depth=16
 	//#pragma HLS INTERFACE axis port=video_out_stream depth=MAX_BURST_NUM
 
     //#pragma HLS INTERFACE ap_none port=debug_vcounter    
@@ -104,7 +108,24 @@ void vidoutgen(
             }
             vidoutgen_clear_control_cls(&regs);
         } else {
+            if (!video_in_stream.empty()) {
+                vidoutgen_rgba_t fgc0, fgc1;
+                vidoutgen_get_fg_color0(&regs, &fgc0);
+                vidoutgen_get_fg_color1(&regs, &fgc1);
+                const uint32_t fgc0_i = vidoutgen_conv_color_to_uint(&fgc0);
+                const uint32_t fgc1_i = vidoutgen_conv_color_to_uint(&fgc1);
 
+                const hackcpu_video_t vd = video_in_stream.read();
+                const uint64_t addr64 = (vd.addr * sizeof(vd.data)*8 * sizeof(vidoutgen_rgba_t) + vidoutgen_get_buf0_offset_addr(&regs))
+                                    / sizeof(uint64_t);
+                const uint16_t repeat = sizeof(vd.data)*8 *sizeof(vidoutgen_rgba_t)/sizeof(uint64_t);
+                for (uint16_t i = 0; i < repeat; i++) {
+                    uint32_t p0 = (vd.data >> (2*i)) & 0x1;
+                    uint32_t p1 = (vd.data >> (2*i+1)) & 0x1;
+                    buffer[i] = (uint64_t)(p0? fgc1_i: fgc0_i) + ((uint64_t)(p1? fgc1_i: fgc0_i) << 32);
+                }
+                copy_line(p_dram, buffer, addr64, repeat);
+            }
         }
     }
 }

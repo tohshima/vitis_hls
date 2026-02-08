@@ -6,10 +6,10 @@
 #include <hls_stream.h>
 #include "hackcpu.hpp"
 #include "axireg_if.hpp"
+#include "../vidoutgen/vidoutgen_def.hpp"
 
 void start_tasks(
-	hls::stream<addr_t>& dispadr_out_fw,
-	hls::stream<word_t>& dispdat_out_fw,
+	hls::stream< hackcpu_video_t >& video_stream,
 	hls::stream< ap_uint<1> >& led_active,
 	hls::stream<token_word_t>& uart_in,
 	hls::stream<char>& uart_out,
