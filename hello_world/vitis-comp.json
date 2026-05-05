@@ -1,0 +1,15 @@
+{
+  "name": "hello_world",
+  "type": "HOST",
+  "platform": "/home/tohshima/repos/vitis_hls/work/dev/platform2024_1/export/platform2024_1/platform2024_1.xpfm",
+  "domain": "standalone_ps7_cortexa9_0",
+  "cpuInstance": "ps7_cortexa9_0",
+  "cpuType": "cortex-a9",
+  "os": "standalone",
+  "configuration": {
+    "componentType": "HOST",
+    "hostToolchainConfigurations": []
+  },
+  "domainRealName": "standalone_ps7_cortexa9_0",
+  "applicationFlow": "EMBEDDED"
+}
