@@ -169,6 +169,7 @@ static inline void _printline(const char* buf) {
 }
 
 static inline void print_regs(hackcpu_regs_t* p_axi_regs, int* p_count) {
+#ifdef VITIS_HLS_SIM
     char buf[256];
     sprintf(buf, "========== %d", (*p_count)++);
     _printline(buf);
@@ -195,6 +196,7 @@ static inline void print_regs(hackcpu_regs_t* p_axi_regs, int* p_count) {
     }
     _printline("");
     _printline("");
+#endif
 }
 
 #ifdef VITIS_HLS_SIM
@@ -282,8 +284,8 @@ static inline void execute_commannd(hackcpu_regs_t* p_reg, hackcpu_reg_t word, h
             button_in0, button_in1, button_in2, button_in3,
             btn_smp_clk, led_btn_L_out, led_btn_R_out, led_active_out,
             uart_reg, debug_phase);
-#endif
         print_regs(p_reg, p_reg_count);
+#endif
     } while (!axireg_is_command_done(p_reg));
 }
 
@@ -321,8 +323,9 @@ static inline void test_bench_axireg(hackcpu_regs_t* p_reg) {
 static inline void test_bench_axireg(uint32_t reg_addr) {
     volatile hackcpu_regs_t* p_reg = (volatile hackcpu_regs_t*)reg_addr;
 #endif
-    //memset(p_reg, 0, sizeof(axi_regs_t));
+    //memset(p_reg, 0, sizeof(axi_regs_t));s
     axireg_clear_uart_enable(p_reg);
+    //axireg_set_uart_enable(p_reg);
     //axireg_set_uart_disp_enable(p_reg);
     int reg_count = 0;
 
